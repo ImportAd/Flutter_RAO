@@ -1,0 +1,164 @@
+import 'package:flutter/material.dart';
+import '../../app/theme.dart';
+
+/// Общий каркас страницы: шапка + контент + «Сообщить о проблеме»
+class AppShell extends StatelessWidget {
+  final String title;
+  final Widget child;
+  final List<Widget>? actions;
+  final bool showBack;
+  final VoidCallback? onBack;
+
+  const AppShell({
+    super.key,
+    required this.title,
+    required this.child,
+    this.actions,
+    this.showBack = false,
+    this.onBack,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: Column(
+        children: [
+          // Шапка
+          _Header(
+            title: title,
+            showBack: showBack,
+            onBack: onBack,
+            actions: actions,
+          ),
+
+          // Контент
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
+}
+
+class _Header extends StatelessWidget {
+  final String title;
+  final bool showBack;
+  final VoidCallback? onBack;
+  final List<Widget>? actions;
+
+  const _Header({
+    required this.title,
+    required this.showBack,
+    this.onBack,
+    this.actions,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border(
+          bottom: BorderSide(color: AppColors.divider),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1200),
+        child: Row(
+          children: [
+            if (showBack) ...[
+              IconButton(
+                icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                onPressed: onBack ?? () => Navigator.of(context).maybePop(),
+                color: AppColors.textSecondary,
+                tooltip: 'Назад',
+              ),
+              const SizedBox(width: 8),
+            ],
+
+            // Навигация «Главная»
+            InkWell(
+              onTap: () {
+                // Всегда можно вернуться на главную
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                }
+              },
+              borderRadius: BorderRadius.circular(4),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Text(
+                  'Главная',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.primary,
+                        decoration: TextDecoration.underline,
+                      ),
+                ),
+              ),
+            ),
+
+            if (title.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Icon(Icons.chevron_right, size: 16, color: AppColors.textHint),
+              ),
+              Flexible(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+
+            const Spacer(),
+
+            // Кнопка «Сообщить о проблеме»
+            TextButton.icon(
+              onPressed: () => _showReportDialog(context),
+              icon: Icon(Icons.flag_outlined, size: 16, color: AppColors.error),
+              label: Text(
+                'Сообщить о проблеме',
+                style: TextStyle(color: AppColors.error, fontSize: 13),
+              ),
+            ),
+
+            if (actions != null) ...actions!,
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showReportDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Сообщить о проблеме'),
+        content: const TextField(
+          maxLines: 4,
+          decoration: InputDecoration(
+            hintText: 'Опишите проблему...',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Спасибо! Сообщение отправлено.')),
+              );
+            },
+            child: const Text('Отправить'),
+          ),
+        ],
+      ),
+    );
+  }
+}
