@@ -1,4 +1,6 @@
 import 'dart:typed_data';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -178,13 +180,16 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
         },
       );
 
-      // Скачиваем файл
-      await _downloadFile(bytes, '${widget.templateCode}.docx');
+      // Скачиваем файл сразу
+      final filename = '${_template!.menuTitle.replaceAll(' ', '_')}.docx';
+      _triggerBrowserDownload(bytes, filename);
 
       if (mounted) {
         context.go('/success', extra: {
           'title': _template!.menuTitle,
           'code': _template!.code,
+          'fileBytes': bytes,
+          'fileName': filename,
         });
       }
     } catch (e) {
@@ -198,16 +203,12 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _downloadFile(Uint8List bytes, String filename) async {
-    // На вебе используем file_saver или html download
+  /// Скачивание файла в браузере через Blob URL
+  void _triggerBrowserDownload(Uint8List bytes, String filename) {
     try {
-      // ignore: avoid_web_libraries_in_flutter
-      // Для Flutter Web: используем dart:html
-      // В продакшене заменить на file_saver пакет
-      // Пока просто скачаем через универсальный подход
-      await FileSaverHelper.saveFile(bytes, filename);
+      _downloadViaBlob(bytes, filename);
     } catch (_) {
-      // Fallback: открываем ссылку на файл
+      // Не критично — на success-странице будет кнопка «Скачать»
     }
   }
 
@@ -231,9 +232,9 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
 
   /// Сценарий 1: Компактная форма (все поля на одной странице)
   Widget _buildCompactForm(TemplateDetail tmpl) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+      child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 700),
           child: Card(
@@ -321,9 +322,9 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
   }
 
   Widget _buildTabContent(TemplateDetail tmpl, _TabInfo tab) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+      child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 800),
           child: Card(
@@ -433,11 +434,13 @@ class _TabInfo {
   _TabInfo({required this.sectionId, required this.title, required this.type});
 }
 
-/// Хелпер для скачивания файла (заглушка — в продакшене использовать file_saver)
-class FileSaverHelper {
-  static Future<void> saveFile(Uint8List bytes, String filename) async {
-    // TODO: Подключить file_saver пакет
-    // import 'package:file_saver/file_saver.dart';
-    // await FileSaver.instance.saveFile(name: filename, bytes: bytes, mimeType: MimeType.microsoftWord);
-  }
+/// Скачивание файла в браузере через Blob URL (Flutter Web)
+void _downloadViaBlob(Uint8List bytes, String filename) {
+  final blob = html.Blob([bytes],
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  final url = html.Url.createObjectUrlFromBlob(blob);
+  html.AnchorElement(href: url)
+    ..setAttribute('download', filename)
+    ..click();
+  html.Url.revokeObjectUrl(url);
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../app/theme.dart';
 
 /// Общий каркас страницы: шапка + контент + «Сообщить о проблеме»
@@ -80,12 +81,7 @@ class _Header extends StatelessWidget {
 
             // Навигация «Главная»
             InkWell(
-              onTap: () {
-                // Всегда можно вернуться на главную
-                if (Navigator.of(context).canPop()) {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                }
-              },
+              onTap: () => GoRouter.of(context).go('/'),
               borderRadius: BorderRadius.circular(4),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),

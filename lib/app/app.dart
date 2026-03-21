@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'theme.dart';
@@ -26,6 +27,8 @@ final _router = GoRouter(
         return SuccessPage(
           templateTitle: extra?['title'] as String? ?? '',
           templateCode: extra?['code'] as String? ?? '',
+          fileBytes: extra?['fileBytes'] as Uint8List?,
+          fileName: extra?['fileName'] as String?,
         );
       },
     ),
