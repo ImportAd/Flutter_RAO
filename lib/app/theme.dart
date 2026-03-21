@@ -188,13 +188,11 @@ class AppTheme {
       ),
 
       // Tabs
-      tabBarTheme: TabBarTheme(
+      tabBarTheme: const TabBarThemeData(
         labelColor: AppColors.primary,
         unselectedLabelColor: AppColors.textHint,
         indicatorColor: AppColors.primary,
         indicatorSize: TabBarIndicatorSize.label,
-        labelStyle: GoogleFonts.notoSans(fontSize: 14, fontWeight: FontWeight.w500),
-        unselectedLabelStyle: GoogleFonts.notoSans(fontSize: 14, fontWeight: FontWeight.w400),
       ),
 
       // Divider
@@ -204,7 +202,7 @@ class AppTheme {
       ),
 
       // Card
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
