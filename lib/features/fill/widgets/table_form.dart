@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../app/theme.dart';
 import '../../../core/models/template_models.dart';
 
-/// Динамическая таблица с добавлением/удалением строк.
-/// Каждая строка — набор полей по колонкам из TableDefModel.
+/// Таблица на всю ширину — без горизонтального скролла.
+/// Ячейки растягиваются, текст переносится.
 class TableForm extends StatelessWidget {
   final SectionModel section;
   final List<Map<String, String>> rows;
@@ -11,14 +11,8 @@ class TableForm extends StatelessWidget {
   final VoidCallback onAddRow;
   final void Function(int rowIndex) onRemoveRow;
 
-  const TableForm({
-    super.key,
-    required this.section,
-    required this.rows,
-    required this.onRowChanged,
-    required this.onAddRow,
-    required this.onRemoveRow,
-  });
+  const TableForm({super.key, required this.section, required this.rows,
+      required this.onRowChanged, required this.onAddRow, required this.onRemoveRow});
 
   @override
   Widget build(BuildContext context) {
@@ -28,114 +22,112 @@ class TableForm extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Заголовки колонок (горизонтальная прокрутка на узких экранах)
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            columnSpacing: 16,
-            headingRowColor: WidgetStateProperty.all(AppColors.surfaceVariant),
-            border: TableBorder.all(
-              color: AppColors.divider,
-              borderRadius: BorderRadius.circular(6),
+        // Таблица на всю ширину
+        Table(
+          border: TableBorder.all(color: AppColors.divider, width: 0.5, borderRadius: BorderRadius.circular(4)),
+          columnWidths: _buildColumnWidths(columns),
+          defaultVerticalAlignment: TableCellVerticalAlignment.top,
+          children: [
+            // Заголовки
+            TableRow(
+              decoration: BoxDecoration(color: AppColors.surfaceVariant),
+              children: [
+                _HeaderCell('№'),
+                for (final col in columns) _HeaderCell(col.label),
+                _HeaderCell(''),
+              ],
             ),
-            columns: [
-              const DataColumn(label: Text('№', style: TextStyle(fontWeight: FontWeight.w600))),
-              for (final col in columns)
-                DataColumn(
-                  label: Text(
-                    col.label,
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                  ),
-                ),
-              const DataColumn(label: SizedBox.shrink()), // Удалить
-            ],
-            rows: List.generate(rows.length, (i) {
-              final row = rows[i];
-              return DataRow(
-                cells: [
-                  DataCell(Text('${i + 1}')),
-                  for (final col in columns)
-                    DataCell(
-                      SizedBox(
-                        width: _columnWidth(col),
-                        child: TextFormField(
-                          initialValue: row[col.name] ?? '',
-                          decoration: InputDecoration(
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 10,
-                            ),
-                            hintText: col.label,
-                            hintStyle: const TextStyle(fontSize: 12, color: AppColors.textHint),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(4),
-                              borderSide: const BorderSide(color: AppColors.fieldBorder),
-                            ),
-                          ),
-                          style: const TextStyle(fontSize: 13),
-                          onChanged: (value) {
-                            final newRow = Map<String, String>.from(row);
-                            newRow[col.name] = value;
-                            onRowChanged(i, newRow);
-                          },
-                        ),
+            // Строки данных
+            for (int i = 0; i < rows.length; i++)
+              TableRow(children: [
+                _DataCell(child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Text('${i + 1}', style: const TextStyle(fontSize: 13)),
+                )),
+                for (final col in columns)
+                  _DataCell(child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: TextFormField(
+                      initialValue: rows[i][col.name] ?? '',
+                      decoration: const InputDecoration(
+                        isDense: true, border: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
                       ),
+                      style: const TextStyle(fontSize: 13),
+                      onChanged: (v) {
+                        final newRow = Map<String, String>.from(rows[i]);
+                        newRow[col.name] = v;
+                        onRowChanged(i, newRow);
+                      },
                     ),
-                  DataCell(
-                    rows.length > 1
-                        ? IconButton(
-                            icon: const Icon(Icons.delete_outline, size: 18),
-                            color: AppColors.error,
-                            tooltip: 'Удалить строку',
-                            onPressed: () => onRemoveRow(i),
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-                ],
-              );
-            }),
-          ),
+                  )),
+                _DataCell(child: rows.length > 1
+                    ? IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 16),
+                        color: AppColors.error, padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                        tooltip: 'Удалить', onPressed: () => onRemoveRow(i))
+                    : const SizedBox(width: 32)),
+              ]),
+          ],
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
 
-        // Кнопка «Добавить строку»
+        // Кнопка «+ Добавить поле»
         if (table.allowDynamicRows && rows.length < table.maxRows)
           Align(
             alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
+            child: TextButton.icon(
               onPressed: onAddRow,
-              icon: const Icon(Icons.add, size: 18),
+              icon: const Icon(Icons.add, size: 16),
               label: const Text('Добавить поле'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: const BorderSide(color: AppColors.primary),
-              ),
+              style: TextButton.styleFrom(foregroundColor: AppColors.primary),
             ),
           ),
       ],
     );
   }
 
-  double _columnWidth(TableColumnModel col) {
-    // Подбираем ширину по типу данных
+  Map<int, TableColumnWidth> _buildColumnWidths(List<TableColumnModel> columns) {
+    final widths = <int, TableColumnWidth>{};
+    // № — фиксированная узкая
+    widths[0] = const FixedColumnWidth(40);
+    // Кнопка удаления — фиксированная
+    widths[columns.length + 1] = const FixedColumnWidth(40);
+    // Остальные — flex, но с весами по типу данных
+    for (int i = 0; i < columns.length; i++) {
+      widths[i + 1] = FlexColumnWidth(_flexWeight(columns[i]));
+    }
+    return widths;
+  }
+
+  double _flexWeight(TableColumnModel col) {
     switch (col.name) {
-      case 'punkt':
-        return 60;
-      case 'name':
-        return 180;
-      case 'address':
-        return 180;
-      case 'area':
-      case 'staf':
-      case 'sum':
-      case 'reg':
-      case 'set':
-      case 'period_fee':
-        return 100;
-      default:
-        return 140;
+      case 'name': case 'address': return 2.5;
+      case 'punkt': return 0.8;
+      case 'area': case 'staf': case 'sum': case 'reg': case 'set': return 1.0;
+      case 'period_fee': return 1.2;
+      default: return 1.5;
     }
   }
+}
+
+class _HeaderCell extends StatelessWidget {
+  final String text;
+  const _HeaderCell(this.text);
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+class _DataCell extends StatelessWidget {
+  final Widget child;
+  const _DataCell({required this.child});
+  @override
+  Widget build(BuildContext context) => child;
 }

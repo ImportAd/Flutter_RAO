@@ -91,7 +91,23 @@ class _Header extends StatelessWidget {
                   'Главная',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppColors.primary,
-                        decoration: TextDecoration.underline,
+                      ),
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 20),
+
+            // «Личный кабинет»
+            InkWell(
+              onTap: () => GoRouter.of(context).go('/documents'),
+              borderRadius: BorderRadius.circular(4),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Text(
+                  'Личный кабинет',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.primary,
                       ),
                 ),
               ),
