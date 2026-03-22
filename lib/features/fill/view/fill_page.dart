@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/models/template_models.dart';
+import '../../../core/utils/number_to_words_ru.dart';
 import '../../../shared/widgets/app_shell.dart';
 import '../widgets/section_form.dart';
 import '../widgets/table_form.dart';
@@ -27,7 +28,15 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
   final Map<String, List<Map<String, String>>> _tableAnswers = {};
   final Map<String, String> _errors = {};
 
-  // Автоподсчитанные итоги
+  /// Дефолты для колонок таблиц: {columnName: [val1, val2]}
+  final Map<String, List<String>> _tableColumnDefaults = {};
+
+  /// Computed поля (пропускаем при рендеринге)
+  final Set<String> _computedFieldNames = {
+    'total_sum_num', 'total_kop', 'total_sum_words',
+    'total_sum', 'sum_words',
+  };
+
   String _totalSumNum = '';
   String _totalKop = '';
   String _totalSumWords = '';
@@ -45,6 +54,10 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
       final api = context.read<ApiClient>();
       final tmpl = await api.getTemplate(widget.templateCode);
 
+      // Добавляем computed fields из шаблона
+      _computedFieldNames.addAll(tmpl.computedFields.map((s) => s.toLowerCase()));
+
+      // Инициализируем ответы
       for (final sec in tmpl.sections) {
         _fieldAnswers[sec.id] = {};
         for (final f in sec.fields) {
@@ -52,7 +65,17 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
             _fieldAnswers[sec.id]![f.name] = f.defaultValue!;
           }
         }
-        if (sec.table != null) _tableAnswers[sec.id] = [{}];
+        if (sec.table != null) {
+          _tableAnswers[sec.id] = [{}];
+          // Загружаем дефолты для колонок таблицы
+          for (final col in sec.table!.columns) {
+            final key = '${sec.id}.${col.name}';
+            try {
+              final vals = await api.getSystemDefaults(key);
+              if (vals.isNotEmpty) _tableColumnDefaults[col.name] = vals;
+            } catch (_) {}
+          }
+        }
       }
 
       // Загрузка старых ответов из истории
@@ -91,16 +114,11 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
     }
   }
 
-  /// Строим табы: секции с полями + секции с таблицами (БЕЗ review)
   List<_TabInfo> _buildTabs(TemplateDetail tmpl) {
     final tabs = <_TabInfo>[];
     for (final sec in tmpl.sections) {
-      if (sec.fields.isNotEmpty) {
-        tabs.add(_TabInfo(sectionId: sec.id, title: sec.title, type: _TabType.fields));
-      }
-      if (sec.table != null) {
-        tabs.add(_TabInfo(sectionId: sec.id, title: sec.title, type: _TabType.table));
-      }
+      if (sec.fields.isNotEmpty) tabs.add(_TabInfo(sectionId: sec.id, title: sec.title, type: _TabType.fields));
+      if (sec.table != null) tabs.add(_TabInfo(sectionId: sec.id, title: sec.title, type: _TabType.table));
     }
     return tabs;
   }
@@ -123,10 +141,7 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
   }
 
   void _addTableRow(String sectionId) {
-    setState(() {
-      _tableAnswers.putIfAbsent(sectionId, () => []);
-      _tableAnswers[sectionId]!.add({});
-    });
+    setState(() { _tableAnswers.putIfAbsent(sectionId, () => []); _tableAnswers[sectionId]!.add({}); });
   }
 
   void _removeTableRow(String sectionId, int index) {
@@ -138,7 +153,6 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
     });
   }
 
-  /// Автоподсчёт итогов из таблицы objects
   void _recalcTotals() {
     double total = 0;
     bool hasAny = false;
@@ -146,7 +160,7 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
       for (final row in entry.value) {
         final raw = row['period_fee'] ?? '';
         if (raw.isEmpty) continue;
-        final val = double.tryParse(raw.replaceAll(',', '.').replaceAll(' ', ''));
+        final val = double.tryParse(raw.replaceAll(',', '.').replaceAll(' ', '').replaceAll('\u00A0', ''));
         if (val != null) { total += val; hasAny = true; }
       }
     }
@@ -155,7 +169,7 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
       final kop = ((total - rub) * 100).round();
       _totalSumNum = '$rub';
       _totalKop = kop.toString().padLeft(2, '0');
-      _totalSumWords = _numberToWordsSimple(rub);
+      _totalSumWords = moneyToWordsRu(rub, kop);
     } else {
       _totalSumNum = '';
       _totalKop = '';
@@ -163,48 +177,50 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
     }
   }
 
-  /// Валидация всех полей — возвращает список ошибок для диалога
   List<String> _validateAll() {
     final tmpl = _template!;
     _errors.clear();
-    final errorMessages = <String>[];
+    final msgs = <String>[];
 
     for (final sec in tmpl.sections) {
       final secAnswers = _fieldAnswers[sec.id] ?? {};
       for (final f in sec.fields) {
-        // Пропускаем computed поля
-        if (['total_sum_num', 'total_kop', 'total_sum_words'].contains(f.name)) continue;
+        if (_computedFieldNames.contains(f.name)) continue;
         if (f.required) {
           final val = secAnswers[f.name]?.trim() ?? '';
           if (val.isEmpty) {
             _errors['${sec.id}.${f.name}'] = 'Обязательное поле';
-            errorMessages.add('${sec.title}: ${f.label}');
+            msgs.add('${sec.title}: ${f.label}');
+            continue;
+          }
+          // Валидация формата
+          final fmtErr = validateFieldFormat(f, val);
+          if (fmtErr != null) {
+            _errors['${sec.id}.${f.name}'] = fmtErr;
+            msgs.add('${sec.title}: ${f.label} — $fmtErr');
           }
         }
       }
     }
     setState(() {});
-    return errorMessages;
+    return msgs;
   }
 
   Future<void> _generate() async {
-    final missingFields = _validateAll();
-    if (missingFields.isNotEmpty) {
-      _showValidationErrors(missingFields);
-      return;
-    }
+    final missing = _validateAll();
+    if (missing.isNotEmpty) { _showValidationErrors(missing); return; }
 
     setState(() => _generating = true);
     try {
       final api = context.read<ApiClient>();
-
-      // Подставляем итоги в answers
       final answers = <String, dynamic>{
         'fields': Map<String, dynamic>.from(_fieldAnswers),
         'tables': _tableAnswers,
       };
+      // Подставляем итоги
       if (_totalSumNum.isNotEmpty) {
-        final totals = (answers['fields'] as Map).putIfAbsent('totals', () => <String, String>{});
+        (answers['fields'] as Map).putIfAbsent('totals', () => <String, String>{});
+        final totals = (answers['fields'] as Map)['totals'];
         if (totals is Map) {
           totals['total_sum_num'] = _totalSumNum;
           totals['total_kop'] = _totalKop;
@@ -212,9 +228,7 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
         }
       }
 
-      final result = await api.generateDocument(
-        templateCode: widget.templateCode, answers: answers);
-
+      final result = await api.generateDocument(templateCode: widget.templateCode, answers: answers);
       if (mounted) {
         context.go('/success', extra: {
           'title': _template!.menuTitle, 'code': _template!.code,
@@ -233,15 +247,13 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
       title: const Text('Не заполнены обязательные поля'),
       content: SizedBox(width: 400, child: SingleChildScrollView(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min,
-          children: fields.map((f) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
+          children: fields.map((f) => Padding(padding: const EdgeInsets.symmetric(vertical: 4),
             child: Row(children: [
               Icon(Icons.warning_amber, size: 16, color: AppColors.error),
               const SizedBox(width: 8),
               Expanded(child: Text(f, style: const TextStyle(fontSize: 14))),
             ]),
-          )).toList(),
-        ),
+          )).toList()),
       )),
       actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Понятно'))],
     ));
@@ -250,66 +262,63 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final tmpl = _template;
-    return AppShell(
-      title: tmpl?.menuTitle ?? 'Загрузка...',
-      showBack: true, onBack: () => context.go('/'),
+    return AppShell(title: tmpl?.menuTitle ?? 'Загрузка...', showBack: true,
+      onBack: () => context.go('/'),
       child: _loading ? const Center(child: CircularProgressIndicator())
           : _error != null ? Center(child: Text(_error!, style: TextStyle(color: AppColors.error)))
           : tmpl!.isCompact ? _buildCompact(tmpl) : _buildTabbed(tmpl),
     );
   }
 
-  /// Компактная форма (1 страница)
   Widget _buildCompact(TemplateDetail tmpl) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-      child: Center(child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 700),
-        child: Card(child: Padding(padding: const EdgeInsets.all(32), child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 900),
+        child: Card(child: Padding(padding: const EdgeInsets.all(32),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text(tmpl.menuTitle, style: Theme.of(context).textTheme.headlineMedium),
             const Divider(height: 32),
             for (final sec in tmpl.sections) ...[
-              if (sec.fields.isNotEmpty) SectionForm(section: sec, answers: _fieldAnswers[sec.id] ?? {},
-                  errors: _errors, onFieldChanged: (n, v) => _setFieldValue(sec.id, n, v)),
-              if (sec.table != null) TableForm(section: sec, rows: _tableAnswers[sec.id] ?? [{}],
-                  onRowChanged: (i, r) => _setTableRow(sec.id, i, r),
-                  onAddRow: () => _addTableRow(sec.id), onRemoveRow: (i) => _removeTableRow(sec.id, i)),
+              if (sec.fields.isNotEmpty) SectionForm(section: sec,
+                  answers: _fieldAnswers[sec.id] ?? {}, errors: _errors,
+                  computedFields: _computedFieldNames,
+                  onFieldChanged: (n, v) => _setFieldValue(sec.id, n, v)),
+              if (sec.table != null) ...[
+                TableForm(section: sec, rows: _tableAnswers[sec.id] ?? [{}],
+                    columnDefaults: _tableColumnDefaults,
+                    onRowChanged: (i, r) => _setTableRow(sec.id, i, r),
+                    onAddRow: () => _addTableRow(sec.id),
+                    onRemoveRow: (i) => _removeTableRow(sec.id, i)),
+                if (_totalSumNum.isNotEmpty) _buildTotalsReadonly(),
+              ],
               const SizedBox(height: 16),
             ],
-            if (_totalSumNum.isNotEmpty) _buildTotalsReadonly(),
             const SizedBox(height: 24),
             _buildGenerateButton(),
-          ],
-        ))),
+          ]),
+        )),
       )),
     );
   }
 
-  /// Форма с табами
   Widget _buildTabbed(TemplateDetail tmpl) {
     final tabs = _buildTabs(tmpl);
     return Column(children: [
       Container(color: AppColors.surface, child: TabBar(
         controller: _tabController, isScrollable: true,
-        tabs: tabs.map((t) => Tab(text: t.title)).toList(),
-      )),
-      Expanded(child: TabBarView(
-        controller: _tabController,
+        tabs: tabs.map((t) => Tab(text: t.title)).toList())),
+      Expanded(child: TabBarView(controller: _tabController,
         children: tabs.asMap().entries.map((e) =>
-            _buildTabContent(tmpl, e.value, isLast: e.key == tabs.length - 1)).toList(),
-      )),
+            _buildTabContent(tmpl, e.value, isLast: e.key == tabs.length - 1)).toList())),
     ]);
   }
 
   Widget _buildTabContent(TemplateDetail tmpl, _TabInfo tab, {required bool isLast}) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-      child: Center(child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 900),
+      child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 900),
         child: Card(child: Padding(padding: const EdgeInsets.all(32),
-          child: _buildTabInner(tmpl, tab, isLast: isLast))),
-      )),
+          child: _buildTabInner(tmpl, tab, isLast: isLast))))),
     );
   }
 
@@ -321,43 +330,59 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
 
       if (tab.type == _TabType.fields)
         SectionForm(section: sec, answers: _fieldAnswers[sec.id] ?? {},
-            errors: _errors, onFieldChanged: (n, v) => _setFieldValue(sec.id, n, v)),
+            errors: _errors, computedFields: _computedFieldNames,
+            onFieldChanged: (n, v) => _setFieldValue(sec.id, n, v)),
 
       if (tab.type == _TabType.table) ...[
         TableForm(section: sec, rows: _tableAnswers[sec.id] ?? [{}],
+            columnDefaults: _tableColumnDefaults,
             onRowChanged: (i, r) => _setTableRow(sec.id, i, r),
-            onAddRow: () => _addTableRow(sec.id), onRemoveRow: (i) => _removeTableRow(sec.id, i)),
+            onAddRow: () => _addTableRow(sec.id),
+            onRemoveRow: (i) => _removeTableRow(sec.id, i)),
         if (_totalSumNum.isNotEmpty) ...[
           const SizedBox(height: 24),
           _buildTotalsReadonly(),
         ],
       ],
 
-      const SizedBox(height: 24),
+      const SizedBox(height: 32),
 
-      // Навигация: Назад / Далее или Сформировать
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        if (_tabController != null && _tabController!.index > 0)
-          SizedBox(width: 200, height: 48, child: ElevatedButton(
-            onPressed: () => _tabController!.animateTo(_tabController!.index - 1),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceVariant,
-                foregroundColor: AppColors.textPrimary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
-            child: const Text('Назад'),
-          ))
-        else const SizedBox(),
-
-        SizedBox(width: isLast ? double.infinity : 200, height: 48, child: isLast
-            ? _buildGenerateButton()
-            : ElevatedButton(
-                onPressed: () => _tabController?.animateTo(_tabController!.index + 1),
+      // Навигация
+      if (!isLast) ...[
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          if (_tabController != null && _tabController!.index > 0)
+            Expanded(child: Padding(padding: const EdgeInsets.only(right: 8),
+              child: SizedBox(height: 48, child: ElevatedButton(
+                onPressed: () => _tabController!.animateTo(_tabController!.index - 1),
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceVariant,
                     foregroundColor: AppColors.textPrimary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
-                child: const Text('Далее'),
-              ),
-        ),
-      ]),
+                child: const Text('Назад')))))
+          else const Spacer(),
+          Expanded(child: Padding(padding: const EdgeInsets.only(left: 8),
+            child: SizedBox(height: 48, child: ElevatedButton(
+              onPressed: () => _tabController?.animateTo(_tabController!.index + 1),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceVariant,
+                  foregroundColor: AppColors.textPrimary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
+              child: const Text('Далее'))))),
+        ]),
+      ] else ...[
+        // Последний таб — Назад + Сформировать
+        if (_tabController != null && _tabController!.index > 0) ...[
+          Row(children: [
+            Expanded(child: SizedBox(height: 48, child: ElevatedButton(
+              onPressed: () => _tabController!.animateTo(_tabController!.index - 1),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceVariant,
+                  foregroundColor: AppColors.textPrimary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
+              child: const Text('Назад')))),
+            const SizedBox(width: 12),
+            Expanded(child: _buildGenerateButton()),
+          ]),
+        ] else
+          _buildGenerateButton(),
+      ],
     ]);
   }
 
@@ -373,42 +398,30 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
     ));
   }
 
-  /// Readonly итоги
   Widget _buildTotalsReadonly() {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Divider(height: 32),
-      _readonlyField('Итоговая сумма, руб', _totalSumNum, 'цифрами'),
+      _roField('Итоговая сумма, руб', _totalSumNum, 'цифрами'),
       const SizedBox(height: 12),
-      _readonlyField('Итоговая сумма, руб', _totalSumWords, 'прописью'),
+      _roField('Итоговая сумма, руб', _totalSumWords, 'прописью'),
       const SizedBox(height: 12),
-      _readonlyField('Итоговая сумма, копейки', _totalKop, 'цифрами'),
+      _roField('Итоговая сумма, копейки', _totalKop, 'цифрами'),
     ]);
   }
 
-  Widget _readonlyField(String label, String value, String hint) {
+  Widget _roField(String label, String value, String hint) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label, style: Theme.of(context).textTheme.titleMedium),
       const SizedBox(height: 6),
-      Container(
-        width: double.infinity,
+      Container(width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.fieldDefaultBg,
-          border: Border.all(color: AppColors.fieldBorder),
-          borderRadius: BorderRadius.circular(4),
-        ),
+        decoration: BoxDecoration(color: AppColors.fieldDefaultBg,
+            border: Border.all(color: AppColors.fieldBorder), borderRadius: BorderRadius.circular(4)),
         child: Text(value.isEmpty ? '—' : value,
-            style: TextStyle(fontSize: 15, color: value.isEmpty ? AppColors.textHint : AppColors.textPrimary)),
-      ),
+            style: TextStyle(fontSize: 15, color: value.isEmpty ? AppColors.textHint : AppColors.textPrimary))),
       Padding(padding: const EdgeInsets.only(top: 4, left: 4),
           child: Text(hint, style: Theme.of(context).textTheme.bodySmall)),
     ]);
-  }
-
-  /// Простой конвертер числа в слова (заглушка — бэкенд пересчитает точно)
-  String _numberToWordsSimple(int n) {
-    if (n == 0) return 'Ноль';
-    return '$n'; // Бэкенд подставит корректное значение прописью
   }
 }
 
