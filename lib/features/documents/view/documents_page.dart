@@ -27,7 +27,10 @@ class _DocumentsPageState extends State<DocumentsPage> {
     try {
       final api = context.read<ApiClient>();
       final docs = await api.getAllDocuments();
-      setState(() { _docs = docs; _loading = false; });
+      setState(() {
+        _docs = docs;
+        _loading = false;
+      });
     } catch (_) {
       setState(() => _loading = false);
     }
@@ -49,28 +52,36 @@ class _DocumentsPageState extends State<DocumentsPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Все документы', style: Theme.of(context).textTheme.headlineMedium),
+                      Text(
+                        'Все документы',
+                        style: Theme.of(context).textTheme.headlineMedium,
+                      ),
                       const SizedBox(height: 8),
-                      Text('${_docs.length} документов', style: Theme.of(context).textTheme.bodyMedium),
+                      Text(
+                        '${_docs.length} документов',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                       const SizedBox(height: 24),
 
                       if (_docs.isEmpty)
                         const Center(child: Text('Документов пока нет'))
                       else
-                        ..._docs.map((d) => _DocumentCard(
-                          doc: d,
-                          onTap: () {
-                            final code = d['template_code'] ?? '';
-                            final docId = d['id'];
-                            context.go('/fill/$code?fromDoc=$docId');
-                          },
-                          onDownload: () {
-                            final fname = d['filename'] ?? '';
-                            if (fname.isNotEmpty) {
-                              _downloadFile(fname);
-                            }
-                          },
-                        )),
+                        ..._docs.map(
+                          (d) => _DocumentCard(
+                            doc: d,
+                            onTap: () {
+                              final code = d['template_code'] ?? '';
+                              final docId = d['id'];
+                              context.go('/fill/$code?fromDoc=$docId');
+                            },
+                            onDownload: () {
+                              final fname = d['filename'] ?? '';
+                              if (fname.isNotEmpty) {
+                                _downloadFile(fname);
+                              }
+                            },
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -79,9 +90,26 @@ class _DocumentsPageState extends State<DocumentsPage> {
     );
   }
 
-  void _downloadFile(String fname) {
-    final base = Uri.base.origin;
-    html.window.open('$base/api/v1/download/$fname', '_blank');
+  Future<void> _downloadFile(String fname) async {
+    try {
+      final api = context.read<ApiClient>();
+      final bytes = await api.downloadFile(fname);
+      final blob = html.Blob(
+        [bytes],
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      );
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      html.AnchorElement(href: url)
+        ..setAttribute('download', fname)
+        ..click();
+      html.Url.revokeObjectUrl(url);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Ошибка скачивания: $e')));
+      }
+    }
   }
 }
 
@@ -90,7 +118,11 @@ class _DocumentCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDownload;
 
-  const _DocumentCard({required this.doc, required this.onTap, required this.onDownload});
+  const _DocumentCard({
+    required this.doc,
+    required this.onTap,
+    required this.onDownload,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -119,10 +151,18 @@ class _DocumentCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text('$date • ${(timeMs / 1000).toStringAsFixed(1)} сек',
-                        style: TextStyle(color: AppColors.textHint, fontSize: 12)),
+                    Text(
+                      '$date • ${(timeMs / 1000).toStringAsFixed(1)} сек',
+                      style: TextStyle(color: AppColors.textHint, fontSize: 12),
+                    ),
                   ],
                 ),
               ),
