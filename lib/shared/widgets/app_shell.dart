@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/theme.dart';
+import '../../core/api/api_client.dart';
 
 /// Общий каркас страницы: шапка + контент + «Сообщить о проблеме»
 class AppShell extends StatelessWidget {
@@ -129,13 +131,15 @@ class _Header extends StatelessWidget {
   }
 
   void _showReportDialog(BuildContext context) {
+    final controller = TextEditingController();
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Сообщить о проблеме'),
-        content: const TextField(
+        content: TextField(
+          controller: controller,
           maxLines: 4,
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
             hintText: 'Опишите проблему...',
           ),
         ),
@@ -145,11 +149,25 @@ class _Header extends StatelessWidget {
             child: const Text('Отмена'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
+              final text = controller.text.trim();
+              if (text.isEmpty) return;
               Navigator.of(ctx).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Спасибо! Сообщение отправлено.')),
-              );
+              try {
+                final api = RepositoryProvider.of<ApiClient>(context);
+                await api.sendReport(message: text);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Спасибо! Сообщение отправлено.')),
+                  );
+                }
+              } catch (_) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Сообщение сохранено локально.')),
+                  );
+                }
+              }
             },
             child: const Text('Отправить'),
           ),

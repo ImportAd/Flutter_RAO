@@ -4,34 +4,19 @@ import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
-import '../../../core/widgets/app_buttons.dart';
 import '../../../shared/widgets/app_shell.dart';
 
 class SuccessPage extends StatelessWidget {
   final String templateTitle;
   final String templateCode;
-  final Uint8List? fileBytes;
-  final String? fileName;
+  final String? filename;       // имя файла на сервере
+  final String? aktFilename;    // имя АКТа (ФОРМАКС)
+  final Uint8List? fileBytes;   // байты основного файла (если передали)
 
   const SuccessPage({
-    super.key,
-    required this.templateTitle,
-    required this.templateCode,
-    this.fileBytes,
-    this.fileName,
+    super.key, required this.templateTitle, required this.templateCode,
+    this.filename, this.aktFilename, this.fileBytes,
   });
-
-  void _downloadFile() {
-    if (fileBytes == null) return;
-    final name = fileName ?? '$templateCode.docx';
-    final blob = html.Blob([fileBytes!],
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    html.AnchorElement(href: url)
-      ..setAttribute('download', name)
-      ..click();
-    html.Url.revokeObjectUrl(url);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,27 +24,23 @@ class SuccessPage extends StatelessWidget {
       title: '',
       child: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+          padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500),
+            constraints: const BoxConstraints(maxWidth: 700),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // Галочка
                 Container(
-                  width: 80,
-                  height: 80,
+                  width: 72, height: 72,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
                     shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.primary, width: 2),
                   ),
-                  child: const Icon(
-                    Icons.check_rounded,
-                    size: 40,
-                    color: AppColors.primary,
-                  ),
+                  child: const Icon(Icons.check, size: 36, color: AppColors.primary),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 28),
 
+                // Заголовок
                 Text(
                   'Договор $templateTitle\nуспешно сформирован',
                   style: Theme.of(context).textTheme.headlineMedium,
@@ -67,50 +48,68 @@ class SuccessPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 32),
 
-                // Скачать документ
-                if (fileBytes != null) ...[
-                  AppPrimaryButton(
-                    label: 'Скачать документ',
-                    icon: Icons.download,
-                    onPressed: _downloadFile,
+                // Кнопка «Скачать файл»
+                SizedBox(
+                  width: 340, height: 48,
+                  child: OutlinedButton(
+                    onPressed: () => _download(context, filename, fileBytes),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    ),
+                    child: const Text('Скачать файл', style: TextStyle(fontSize: 15)),
                   ),
+                ),
+
+                // Кнопка «Скачать акт» (ФОРМАКС)
+                if (aktFilename != null) ...[
                   const SizedBox(height: 12),
+                  SizedBox(
+                    width: 340, height: 48,
+                    child: OutlinedButton(
+                      onPressed: () => _downloadFromServer(context, aktFilename!),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      ),
+                      child: const Text('Скачать акт', style: TextStyle(fontSize: 15)),
+                    ),
+                  ),
                 ],
 
-                AppSecondaryButton(
-                  label: 'Продолжить заполнение',
-                  icon: Icons.edit_document,
-                  onPressed: () => context.go('/fill/$templateCode'),
-                ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 40),
 
-                AppSecondaryButton(
-                  label: 'Выбрать другой договор',
-                  icon: Icons.home_outlined,
-                  onPressed: () => context.go('/'),
+                // Разделитель «или»
+                Row(
+                  children: [
+                    const Expanded(child: Divider()),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text('или', style: Theme.of(context).textTheme.bodyMedium),
+                    ),
+                    const Expanded(child: Divider()),
+                  ],
                 ),
 
                 const SizedBox(height: 32),
-                const Divider(),
-                const SizedBox(height: 16),
 
-                Text(
-                  'Выберите компанию',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                ),
+                // Создать новый документ
+                Text('Создать новый документ', style: Theme.of(context).textTheme.headlineMedium),
+                const SizedBox(height: 28),
+
+                // Компания
+                Text('Компания', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 12),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    _CompanyChip(label: 'ФОРМАКС', onTap: () => context.go('/')),
-                    _CompanyChip(label: 'РАО', onTap: () => context.go('/')),
-                    _CompanyChip(label: 'ВОИС', onTap: () => context.go('/')),
-                  ],
-                ),
+                _CompanyRow(onTap: (company) => context.go('/')),
+
+                const SizedBox(height: 24),
+
+                // Форма собственности
+                Text('Форма собственности', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 12),
+                _FormRow(onTap: (form) => context.go('/')),
               ],
             ),
           ),
@@ -118,25 +117,90 @@ class SuccessPage extends StatelessWidget {
       ),
     );
   }
+
+  void _download(BuildContext context, String? fname, Uint8List? bytes) {
+    if (bytes != null) {
+      _downloadBlob(bytes, fname ?? '$templateCode.docx');
+    } else if (fname != null) {
+      _downloadFromServer(context, fname);
+    }
+  }
+
+  void _downloadBlob(Uint8List bytes, String filename) {
+    final blob = html.Blob([bytes],
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    html.AnchorElement(href: url)..setAttribute('download', filename)..click();
+    html.Url.revokeObjectUrl(url);
+  }
+
+  void _downloadFromServer(BuildContext context, String fname) {
+    // Открываем URL скачивания
+    final base = Uri.base.origin;
+    html.window.open('$base/api/v1/download/$fname', '_blank');
+  }
 }
 
-class _CompanyChip extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-
-  const _CompanyChip({required this.label, required this.onTap});
+class _CompanyRow extends StatelessWidget {
+  final ValueChanged<String> onTap;
+  const _CompanyRow({required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.textPrimary,
-        side: const BorderSide(color: AppColors.fieldBorder),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+    return Container(
+      decoration: BoxDecoration(border: Border.all(color: AppColors.divider), borderRadius: BorderRadius.circular(4)),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            for (final c in ['ФОРМАКС', 'РАО', 'ВОИС'])
+              Expanded(
+                child: InkWell(
+                  onTap: () => onTap(c),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      border: Border(left: c == 'ФОРМАКС' ? BorderSide.none : BorderSide(color: AppColors.divider)),
+                    ),
+                    child: Text(c, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
-      child: Text(label),
+    );
+  }
+}
+
+class _FormRow extends StatelessWidget {
+  final ValueChanged<String> onTap;
+  const _FormRow({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(border: Border.all(color: AppColors.divider), borderRadius: BorderRadius.circular(4)),
+      child: IntrinsicHeight(
+        child: Row(
+          children: [
+            for (final f in ['ООО', 'ИП до 2017', 'ИП с 2017'])
+              Expanded(
+                child: InkWell(
+                  onTap: () => onTap(f),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      border: Border(left: f == 'ООО' ? BorderSide.none : BorderSide(color: AppColors.divider)),
+                    ),
+                    child: Text(f, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -1,6 +1,4 @@
 import 'dart:typed_data';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -16,7 +14,8 @@ import '../widgets/review_panel.dart';
 
 class FillPage extends StatefulWidget {
   final String templateCode;
-  const FillPage({super.key, required this.templateCode});
+  final int? fromDocId;  // ID старого документа для загрузки заполненных полей
+  const FillPage({super.key, required this.templateCode, this.fromDocId});
 
   @override
   State<FillPage> createState() => _FillPageState();
@@ -65,12 +64,37 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
           }
         }
         if (sec.table != null) {
-          // Начинаем с одной пустой строки
           _tableAnswers[sec.id] = [{}];
         }
       }
 
-      // Создаём TabController для многостраничных шаблонов
+      // Загружаем старые ответы, если возвращаемся к документу из истории
+      if (widget.fromDocId != null) {
+        try {
+          final oldDoc = await api.getDocument(widget.fromDocId!);
+          final oldAnswers = oldDoc['answers'] as Map<String, dynamic>? ?? {};
+          final oldFields = oldAnswers['fields'] as Map<String, dynamic>? ?? {};
+          final oldTables = oldAnswers['tables'] as Map<String, dynamic>? ?? {};
+
+          for (final entry in oldFields.entries) {
+            if (entry.value is Map) {
+              _fieldAnswers[entry.key] = Map<String, String>.from(
+                  (entry.value as Map).map((k, v) => MapEntry(k.toString(), v.toString())));
+            }
+          }
+          for (final entry in oldTables.entries) {
+            if (entry.value is List) {
+              _tableAnswers[entry.key] = (entry.value as List)
+                  .map((row) => Map<String, String>.from(
+                      (row as Map).map((k, v) => MapEntry(k.toString(), v.toString()))))
+                  .toList();
+            }
+          }
+        } catch (_) {
+          // Не критично — продолжаем с дефолтными значениями
+        }
+      }
+
       if (!tmpl.isCompact) {
         final tabCount = _buildTabs(tmpl).length;
         _tabController = TabController(length: tabCount, vsync: this);
@@ -172,7 +196,8 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
 
     try {
       final api = context.read<ApiClient>();
-      final bytes = await api.generateDocument(
+      // API теперь возвращает JSON с filename, а не байты
+      final result = await api.generateDocument(
         templateCode: widget.templateCode,
         answers: {
           'fields': _fieldAnswers,
@@ -180,16 +205,13 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
         },
       );
 
-      // Скачиваем файл сразу
-      final filename = '${_template!.menuTitle.replaceAll(' ', '_')}.docx';
-      _triggerBrowserDownload(bytes, filename);
-
+      // НЕ скачиваем автоматически — пользователь нажмёт «Скачать файл»
       if (mounted) {
         context.go('/success', extra: {
           'title': _template!.menuTitle,
           'code': _template!.code,
-          'fileBytes': bytes,
-          'fileName': filename,
+          'filename': result['filename'],
+          'akt_filename': result['akt_filename'],
         });
       }
     } catch (e) {
@@ -200,15 +222,6 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
       }
     } finally {
       if (mounted) setState(() => _generating = false);
-    }
-  }
-
-  /// Скачивание файла в браузере через Blob URL
-  void _triggerBrowserDownload(Uint8List bytes, String filename) {
-    try {
-      _downloadViaBlob(bytes, filename);
-    } catch (_) {
-      // Не критично — на success-странице будет кнопка «Скачать»
     }
   }
 
@@ -432,15 +445,4 @@ class _TabInfo {
   final String title;
   final _TabType type;
   _TabInfo({required this.sectionId, required this.title, required this.type});
-}
-
-/// Скачивание файла в браузере через Blob URL (Flutter Web)
-void _downloadViaBlob(Uint8List bytes, String filename) {
-  final blob = html.Blob([bytes],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-  final url = html.Url.createObjectUrlFromBlob(blob);
-  html.AnchorElement(href: url)
-    ..setAttribute('download', filename)
-    ..click();
-  html.Url.revokeObjectUrl(url);
 }
