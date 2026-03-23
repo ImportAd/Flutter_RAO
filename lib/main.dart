@@ -6,7 +6,7 @@ import 'core/api/api_client.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final apiClient = ApiClient(baseUrl: 'http://localhost:8000');
+  final apiClient = ApiClient(baseUrl: '');
 
   runApp(
     RepositoryProvider<ApiClient>.value(
