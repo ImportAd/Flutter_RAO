@@ -1,0 +1,12 @@
+.flutter-plugins-dependencies
+pubspec.lock
+.dart_tool/
+.idea/
+linux/
+.metadata
+.macos/
+analysis_options.yaml
+doc_generator.iml
+build/
+android/
+devtools_options.yaml
