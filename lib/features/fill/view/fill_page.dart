@@ -69,11 +69,19 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
           _tableAnswers[sec.id] = [{}];
           // Загружаем дефолты для колонок таблицы
           for (final col in sec.table!.columns) {
+            // Пробуем ключ section_id.column_name
             final key = '${sec.id}.${col.name}';
             try {
               final vals = await api.getSystemDefaults(key);
-              if (vals.isNotEmpty) _tableColumnDefaults[col.name] = vals;
+              if (vals.isNotEmpty) { _tableColumnDefaults[col.name] = vals; continue; }
             } catch (_) {}
+            // Пробуем известные алиасы из defaults.json
+            for (final alias in _columnAliases(sec.id, col.name)) {
+              try {
+                final vals = await api.getSystemDefaults(alias);
+                if (vals.isNotEmpty) { _tableColumnDefaults[col.name] = vals; break; }
+              } catch (_) {}
+            }
           }
         }
       }
@@ -112,6 +120,18 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
     } catch (e) {
       setState(() { _error = '$e'; _loading = false; });
     }
+  }
+
+    /// Алиасы ключей для дефолтов — маппинг column_name → возможные ключи в defaults.json
+  List<String> _columnAliases(String sectionId, String colName) {
+    const aliases = {
+      'set': ['payment_terms'],          // "Порядок оплаты"
+      'payment_order': ['payment_terms'],
+      'punkt': ['category'],
+      'staf': ['tariff'],
+    };
+    final alts = aliases[colName] ?? [];
+    return alts.map((a) => '$sectionId.$a').toList();
   }
 
   List<_TabInfo> _buildTabs(TemplateDetail tmpl) {
