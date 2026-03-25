@@ -34,7 +34,7 @@ class _LoginPageState extends State<LoginPage> {
         context.go('/');
       }
     } catch (e) {
-      setState(() => _error = 'Ошибка: $e');
+      setState(() => _error = 'Неверный логин или пароль');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
