@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 /// Цветовая палитра — бирюзовый акцент по макетам
 class AppColors {
   AppColors._();
-  static const Color primary = Color(0xFF009688);       // бирюзовый (из макетов)
+  static const Color primary = Color(0xFF01909B);       // бирюзовый (из макетов)
   static const Color primaryDark = Color(0xFF00796B);
   static const Color primaryLight = Color(0xFF4DB6AC);
 
