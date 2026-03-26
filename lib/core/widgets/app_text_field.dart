@@ -146,14 +146,14 @@ class AppTextField extends StatelessWidget {
                   ),
             ),
           )
-        else if (hint != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 4, left: 4),
-            child: Text(
-              hint!,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
+        // else if (hint != null)
+        //   Padding(
+        //     padding: const EdgeInsets.only(top: 4, left: 4),
+        //     child: Text(
+        //       hint!,
+        //       style: Theme.of(context).textTheme.bodySmall,
+        //     ),
+        //   ),
       ],
     );
   }
