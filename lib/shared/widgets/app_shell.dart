@@ -91,30 +91,21 @@ class _Header extends StatelessWidget {
             const SizedBox(width: 20),
 
             // «Личный кабинет»
-            InkWell(
+            HeaderNavLink(
+              label: 'Личный кабинет',
               onTap: () => GoRouter.of(context).go('/documents'),
-              borderRadius: BorderRadius.circular(4),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                child: Text(
-                  'Личный кабинет',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.primary,
-                      ),
-                ),
-              ),
             ),
-
+            const Spacer(),
             if (title.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Icon(Icons.chevron_right, size: 16, color: AppColors.textHint),
-              ),
-              Flexible(
+              // Padding(
+              //   padding: const EdgeInsets.symmetric(horizontal: 8),
+              //   child: Icon(Icons.chevron_right, size: 16, color: AppColors.textHint),
+              // ),
+              Center(
                 child: Text(
                   title,
                   style: Theme.of(context).textTheme.titleMedium,
-                  overflow: TextOverflow.ellipsis,
+                  // overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -122,13 +113,9 @@ class _Header extends StatelessWidget {
             const Spacer(),
 
             // Кнопка «Сообщить о проблеме»
-            TextButton.icon(
-              onPressed: () => _showReportDialog(context),
-              icon: Icon(Icons.flag_outlined, size: 16, color: AppColors.error),
-              label: Text(
-                'Сообщить о проблеме',
-                style: TextStyle(color: AppColors.error, fontSize: 13),
-              ),
+             HeaderNavLink(
+              label: 'Сообщить о проблеме',
+              onTap: () => _showReportDialog(context),
             ),
 
             if (actions != null) ...actions!,

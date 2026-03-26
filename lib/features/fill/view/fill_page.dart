@@ -325,7 +325,7 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
     final tabs = _buildTabs(tmpl);
     return Column(children: [
       Container(color: AppColors.surface, child: TabBar(
-        controller: _tabController, isScrollable: true,
+        controller: _tabController, isScrollable: false,
         tabs: tabs.map((t) => Tab(text: t.title)).toList())),
       Expanded(child: TabBarView(controller: _tabController,
         children: tabs.asMap().entries.map((e) =>
@@ -346,7 +346,8 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
     final sec = tmpl.sections.firstWhere((s) => s.id == tab.sectionId);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Text(sec.title, style: Theme.of(context).textTheme.headlineMedium),
-      const Divider(height: 32),
+      // const Divider(height: 32),
+      const SizedBox(height: 64,),
 
       if (tab.type == _TabType.fields)
         SectionForm(section: sec, answers: _fieldAnswers[sec.id] ?? {},

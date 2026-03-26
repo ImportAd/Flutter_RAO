@@ -1,3 +1,4 @@
+import 'package:doc_generator/shared/widgets/header_nav_link.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -126,7 +127,7 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(height: 48),
 
                 // === Заполнить документ ===
-                Text('Заполнить документ', style: Theme.of(context).textTheme.headlineMedium),
+                Text('Заполнить документ', style: Theme.of(context).textTheme.headlineLarge),
                 const SizedBox(height: 28),
 
                 // Компания
@@ -195,10 +196,15 @@ class _HomePageState extends State<HomePage> {
                       onPressed: () => context.go('/fill/$_resolvedCode'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.surfaceVariant,
-                        foregroundColor: AppColors.textPrimary,
+                        foregroundColor: AppColors.textWhite,
+                        overlayColor: AppColors.buttonActiveHover, 
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                       ),
-                      child: const Text('Заполнить', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+                      child: const Text('Заполнить', style: TextStyle(fontSize: 18,
+                                      fontWeight: FontWeight.w400, 
+                                      height: 22 / 18,
+                                      ),
+                                      ),
                     ),
                   )
                 else if (_company != null)
@@ -212,7 +218,11 @@ class _HomePageState extends State<HomePage> {
                           disabledForegroundColor: AppColors.buttonTextDisabled,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                         ),
-                        child: const Text('Заполнить'),
+                        child: const Text('Заполнить', style: TextStyle(fontSize: 18,                       
+                                      fontWeight: FontWeight.w400, 
+                                      height: 22 / 18,
+                                      ),
+                                      ),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -234,10 +244,10 @@ class _HomePageState extends State<HomePage> {
         Row(children: [
           Text('Последние заполненные документы', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(width: 16),
-          TextButton(
-            onPressed: () => context.go('/documents'),
-            child: Text('Все документы', style: TextStyle(color: AppColors.primary, fontSize: 14)),
-          ),
+           HeaderNavLink(
+              label: 'Все документы',
+              onTap: () => context.go('/documents'),
+            ),
         ]),
         const SizedBox(height: 16),
         if (_loadingRecent)
