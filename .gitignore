@@ -10,3 +10,7 @@ doc_generator.iml
 build/
 android/
 devtools_options.yaml
+dev_backend/
+templates_yaml/
+word_templates/
+.vscode/

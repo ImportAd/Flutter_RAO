@@ -1,3 +1,4 @@
+import 'package:doc_generator/shared/widgets/header_nav_link.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -82,18 +83,9 @@ class _Header extends StatelessWidget {
             ],
 
             // Навигация «Главная»
-            InkWell(
+            HeaderNavLink(
+              label: 'Главная',
               onTap: () => GoRouter.of(context).go('/'),
-              borderRadius: BorderRadius.circular(4),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                child: Text(
-                  'Главная',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.primary,
-                      ),
-                ),
-              ),
             ),
 
             const SizedBox(width: 20),

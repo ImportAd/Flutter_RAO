@@ -17,12 +17,12 @@ class AppColors {
   static const Color textHint = Color(0xFF9E9E9E);
 
   static const Color fieldBorder = Color(0xFFE0E0E0);
-  static const Color fieldBorderFocused = Color(0xFF009688);
+  static const Color fieldBorderFocused = Color(0xFF01909B); // цвет рамки
   static const Color fieldBackground = Color(0xFFFFFFFF);
   static const Color fieldDisabled = Color(0xFFF5F5F5);
   static const Color fieldDefaultBg = Color(0xFFF0FDFA);  // лёгкий бирюзовый фон для дефолтных полей
 
-  static const Color error = Color(0xFFD32F2F);
+  static const Color error = Color(0xDBE00F0F); // ошибка 
   static const Color errorLight = Color(0xFFFFEBEE);
 
   static const Color divider = Color(0xFFE0E0E0);
