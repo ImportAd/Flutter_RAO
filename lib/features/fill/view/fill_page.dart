@@ -67,15 +67,12 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
         }
         if (sec.table != null) {
           _tableAnswers[sec.id] = [{}];
-          // Загружаем дефолты для колонок таблицы
           for (final col in sec.table!.columns) {
-            // Пробуем ключ section_id.column_name
             final key = '${sec.id}.${col.name}';
             try {
               final vals = await api.getSystemDefaults(key);
               if (vals.isNotEmpty) { _tableColumnDefaults[col.name] = vals; continue; }
             } catch (_) {}
-            // Пробуем известные алиасы из defaults.json
             for (final alias in _columnAliases(sec.id, col.name)) {
               try {
                 final vals = await api.getSystemDefaults(alias);
@@ -122,10 +119,9 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
     }
   }
 
-    /// Алиасы ключей для дефолтов — маппинг column_name → возможные ключи в defaults.json
   List<String> _columnAliases(String sectionId, String colName) {
     const aliases = {
-      'set': ['payment_terms'],          // "Порядок оплаты"
+      'set': ['payment_terms'],
       'payment_order': ['payment_terms'],
       'punkt': ['category'],
       'staf': ['tariff'],
@@ -134,11 +130,24 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
     return alts.map((a) => '$sectionId.$a').toList();
   }
 
+  /// Секция считается «скрытой», если ВСЕ её поля — computed
+  bool _isSectionHidden(SectionModel sec) {
+    if (sec.fields.isEmpty) return false; // у таблиц полей нет — не скрываем
+    return sec.fields.every((f) => _computedFieldNames.contains(f.name));
+  }
+
   List<_TabInfo> _buildTabs(TemplateDetail tmpl) {
     final tabs = <_TabInfo>[];
     for (final sec in tmpl.sections) {
-      if (sec.fields.isNotEmpty) tabs.add(_TabInfo(sectionId: sec.id, title: sec.title, type: _TabType.fields));
-      if (sec.table != null) tabs.add(_TabInfo(sectionId: sec.id, title: sec.title, type: _TabType.table));
+      // ── Пропускаем секции, где все поля — computed (totals) ──
+      if (_isSectionHidden(sec)) continue;
+
+      if (sec.fields.isNotEmpty) {
+        tabs.add(_TabInfo(sectionId: sec.id, title: sec.title, type: _TabType.fields));
+      }
+      if (sec.table != null) {
+        tabs.add(_TabInfo(sectionId: sec.id, title: sec.title, type: _TabType.table));
+      }
     }
     return tabs;
   }
@@ -207,13 +216,14 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
       for (final f in sec.fields) {
         if (_computedFieldNames.contains(f.name)) continue;
         if (f.required) {
-          final val = secAnswers[f.name]?.trim() ?? '';
+          var val = secAnswers[f.name]?.trim() ?? '';
+          // Маска даты с подчёркиваниями = пусто
+          if (f.type == 'date' && val.contains('_')) val = '';
           if (val.isEmpty) {
             _errors['${sec.id}.${f.name}'] = 'Обязательное поле';
             msgs.add('${sec.title}: ${f.label}');
             continue;
           }
-          // Валидация формата
           final fmtErr = validateFieldFormat(f, val);
           if (fmtErr != null) {
             _errors['${sec.id}.${f.name}'] = fmtErr;
@@ -237,7 +247,7 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
         'fields': Map<String, dynamic>.from(_fieldAnswers),
         'tables': _tableAnswers,
       };
-      // Подставляем итоги
+      // Подставляем итоги (скрыты от пользователя, но отправляются на бэкенд)
       if (_totalSumNum.isNotEmpty) {
         (answers['fields'] as Map).putIfAbsent('totals', () => <String, String>{});
         final totals = (answers['fields'] as Map)['totals'];
@@ -290,7 +300,12 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
     );
   }
 
+  // ──────────── Compact layout (маленькие шаблоны) ────────────
+
   Widget _buildCompact(TemplateDetail tmpl) {
+    // Фильтруем скрытые секции (totals и т.п.)
+    final visibleSections = tmpl.sections.where((s) => !_isSectionHidden(s)).toList();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
       child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 900),
@@ -298,19 +313,17 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Text(tmpl.menuTitle, style: Theme.of(context).textTheme.headlineMedium),
             const Divider(height: 32),
-            for (final sec in tmpl.sections) ...[
+            for (final sec in visibleSections) ...[
               if (sec.fields.isNotEmpty) SectionForm(section: sec,
                   answers: _fieldAnswers[sec.id] ?? {}, errors: _errors,
                   computedFields: _computedFieldNames,
                   onFieldChanged: (n, v) => _setFieldValue(sec.id, n, v)),
-              if (sec.table != null) ...[
+              if (sec.table != null)
                 TableForm(section: sec, rows: _tableAnswers[sec.id] ?? [{}],
                     columnDefaults: _tableColumnDefaults,
                     onRowChanged: (i, r) => _setTableRow(sec.id, i, r),
                     onAddRow: () => _addTableRow(sec.id),
                     onRemoveRow: (i) => _removeTableRow(sec.id, i)),
-                if (_totalSumNum.isNotEmpty) _buildTotalsReadonly(),
-              ],
               const SizedBox(height: 16),
             ],
             const SizedBox(height: 24),
@@ -320,6 +333,8 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
       )),
     );
   }
+
+  // ──────────── Tabbed layout ────────────
 
   Widget _buildTabbed(TemplateDetail tmpl) {
     final tabs = _buildTabs(tmpl);
@@ -334,11 +349,23 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
   }
 
   Widget _buildTabContent(TemplateDetail tmpl, _TabInfo tab, {required bool isLast}) {
+    final isTable = tab.type == _TabType.table;
+    // Таблицы — шире, меньше боковых отступов
+    final maxW = isTable ? 1400.0 : 900.0;
+    final hPad = isTable ? 16.0 : 24.0;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-      child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 900),
-        child: Card(child: Padding(padding: const EdgeInsets.all(32),
-          child: _buildTabInner(tmpl, tab, isLast: isLast))))),
+      padding: EdgeInsets.symmetric(vertical: 32, horizontal: hPad),
+      child: Center(child: ConstrainedBox(constraints: BoxConstraints(maxWidth: maxW),
+        child: isTable
+            // Таблица без Card-обёртки для максимальной ширины
+            ? Padding(
+                padding: const EdgeInsets.all(16),
+                child: _buildTabInner(tmpl, tab, isLast: isLast),
+              )
+            : Card(child: Padding(padding: const EdgeInsets.all(32),
+                child: _buildTabInner(tmpl, tab, isLast: isLast))),
+      )),
     );
   }
 
@@ -346,25 +373,19 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
     final sec = tmpl.sections.firstWhere((s) => s.id == tab.sectionId);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Text(sec.title, style: Theme.of(context).textTheme.headlineMedium),
-      // const Divider(height: 32),
-      const SizedBox(height: 64,),
+      const SizedBox(height: 64),
 
       if (tab.type == _TabType.fields)
         SectionForm(section: sec, answers: _fieldAnswers[sec.id] ?? {},
             errors: _errors, computedFields: _computedFieldNames,
             onFieldChanged: (n, v) => _setFieldValue(sec.id, n, v)),
 
-      if (tab.type == _TabType.table) ...[
+      if (tab.type == _TabType.table)
         TableForm(section: sec, rows: _tableAnswers[sec.id] ?? [{}],
             columnDefaults: _tableColumnDefaults,
             onRowChanged: (i, r) => _setTableRow(sec.id, i, r),
             onAddRow: () => _addTableRow(sec.id),
             onRemoveRow: (i) => _removeTableRow(sec.id, i)),
-        if (_totalSumNum.isNotEmpty) ...[
-          const SizedBox(height: 24),
-          _buildTotalsReadonly(),
-        ],
-      ],
 
       const SizedBox(height: 32),
 
@@ -389,7 +410,6 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
               child: const Text('Далее'))))),
         ]),
       ] else ...[
-        // Последний таб — Назад + Сформировать
         if (_tabController != null && _tabController!.index > 0) ...[
           Row(children: [
             Expanded(child: SizedBox(height: 48, child: ElevatedButton(
@@ -417,32 +437,6 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
           ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
           : const Text('Сформировать документ', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
     ));
-  }
-
-  Widget _buildTotalsReadonly() {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Divider(height: 32),
-      _roField('Итоговая сумма, руб', _totalSumNum, 'цифрами'),
-      const SizedBox(height: 12),
-      _roField('Итоговая сумма, руб', _totalSumWords, 'прописью'),
-      const SizedBox(height: 12),
-      _roField('Итоговая сумма, копейки', _totalKop, 'цифрами'),
-    ]);
-  }
-
-  Widget _roField(String label, String value, String hint) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: Theme.of(context).textTheme.titleMedium),
-      const SizedBox(height: 6),
-      Container(width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(color: AppColors.fieldDefaultBg,
-            border: Border.all(color: AppColors.fieldBorder), borderRadius: BorderRadius.circular(4)),
-        child: Text(value.isEmpty ? '—' : value,
-            style: TextStyle(fontSize: 15, color: value.isEmpty ? AppColors.textHint : AppColors.textPrimary))),
-      Padding(padding: const EdgeInsets.only(top: 4, left: 4),
-          child: Text(hint, style: Theme.of(context).textTheme.bodySmall)),
-    ]);
   }
 }
 

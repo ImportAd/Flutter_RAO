@@ -25,46 +25,71 @@ class TableForm extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Table(
-          border: TableBorder.all(color: AppColors.divider, width: 0.5,
-              borderRadius: BorderRadius.circular(4)),
+          border: TableBorder.all(
+            color: AppColors.divider,
+            width: 1,
+            borderRadius: BorderRadius.circular(4),
+          ),
           columnWidths: _buildColumnWidths(columns),
-          defaultVerticalAlignment: TableCellVerticalAlignment.top,
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
           children: [
-            // Заголовки
+            // ── Заголовки ──
             TableRow(
-              decoration: BoxDecoration(color: AppColors.surfaceVariant),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF7F7F7), // светло-серый, не бирюзовый
+              ),
               children: [
                 _HCell('№'),
                 for (final col in columns) _HCell(col.label),
                 _HCell(''),
               ],
             ),
-            // Строки
+            // ── Строки данных ──
             for (int i = 0; i < rows.length; i++)
-              TableRow(children: [
-                _DCell(child: Padding(padding: const EdgeInsets.all(8),
-                    child: Text('${i + 1}', style: const TextStyle(fontSize: 13)))),
-                for (final col in columns)
-                  _DCell(child: _buildCell(context, col, i)),
-                _DCell(child: rows.length > 1
-                    ? IconButton(icon: const Icon(Icons.delete_outline, size: 16),
-                        color: AppColors.error, padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                        onPressed: () => onRemoveRow(i))
-                    : const SizedBox(width: 32)),
-              ]),
+              TableRow(
+                decoration: const BoxDecoration(
+                  color: Colors.white, // белый фон строк
+                ),
+                children: [
+                  _DCell(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      child: Text(
+                        '${i + 1}',
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ),
+                  for (final col in columns)
+                    _DCell(child: _buildCell(context, col, i)),
+                  _DCell(
+                    child: rows.length > 1
+                        ? IconButton(
+                            icon: const Icon(Icons.delete_outline, size: 18),
+                            color: AppColors.error,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                            onPressed: () => onRemoveRow(i),
+                          )
+                        : const SizedBox(width: 36),
+                  ),
+                ],
+              ),
           ],
         ),
 
         const SizedBox(height: 12),
 
         if (table.allowDynamicRows && rows.length < table.maxRows)
-          Align(alignment: Alignment.centerLeft, child: TextButton.icon(
-            onPressed: onAddRow,
-            icon: const Icon(Icons.add, size: 16),
-            label: const Text('Добавить поле'),
-            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-          )),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: onAddRow,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Добавить строку', style: TextStyle(fontSize: 15)),
+              style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+            ),
+          ),
       ],
     );
   }
@@ -89,14 +114,15 @@ class TableForm extends StatelessWidget {
 
     // Обычная ячейка для ввода
     return Padding(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: TextFormField(
         initialValue: currentVal,
         decoration: const InputDecoration(
-          isDense: true, border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          isDense: true,
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 10),
         ),
-        style: const TextStyle(fontSize: 13),
+        style: const TextStyle(fontSize: 15),
         onChanged: (v) {
           final newRow = Map<String, String>.from(row);
           newRow[col.name] = v;
@@ -108,8 +134,8 @@ class TableForm extends StatelessWidget {
 
   Map<int, TableColumnWidth> _buildColumnWidths(List<TableColumnModel> columns) {
     final w = <int, TableColumnWidth>{};
-    w[0] = const FixedColumnWidth(36);
-    w[columns.length + 1] = const FixedColumnWidth(36);
+    w[0] = const FixedColumnWidth(42);                    // №
+    w[columns.length + 1] = const FixedColumnWidth(42);   // удалить
     for (int i = 0; i < columns.length; i++) {
       w[i + 1] = FlexColumnWidth(_flex(columns[i]));
     }
@@ -140,26 +166,28 @@ class _DropdownCell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: PopupMenuButton<String>(
         onSelected: onChanged,
         tooltip: 'Выбрать значение',
         position: PopupMenuPosition.under,
         itemBuilder: (_) => options.map((o) => PopupMenuItem(
           value: o,
-          child: Text(o, style: const TextStyle(fontSize: 13)),
+          child: Text(o, style: const TextStyle(fontSize: 14)),
         )).toList(),
         child: Container(
-          constraints: const BoxConstraints(minHeight: 36),
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+          constraints: const BoxConstraints(minHeight: 40),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
           child: Row(children: [
             Expanded(child: Text(
               value.isEmpty ? 'Выбрать' : value,
-              style: TextStyle(fontSize: 13,
-                  color: value.isEmpty ? AppColors.textHint : AppColors.textPrimary),
+              style: TextStyle(
+                fontSize: 15,
+                color: value.isEmpty ? AppColors.textHint : AppColors.textPrimary,
+              ),
               overflow: TextOverflow.ellipsis,
             )),
-            Icon(Icons.arrow_drop_down, size: 18, color: AppColors.primary),
+            Icon(Icons.arrow_drop_down, size: 20, color: AppColors.primary),
           ]),
         ),
       ),
@@ -167,16 +195,26 @@ class _DropdownCell extends StatelessWidget {
   }
 }
 
+/// Ячейка заголовка
 class _HCell extends StatelessWidget {
   final String text;
   const _HCell(this.text);
-  @override Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(8),
-    child: Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)));
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+        child: Text(text,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            )),
+      );
 }
 
+/// Обёртка ячейки данных
 class _DCell extends StatelessWidget {
   final Widget child;
   const _DCell({required this.child});
-  @override Widget build(BuildContext context) => child;
+  @override
+  Widget build(BuildContext context) => child;
 }
