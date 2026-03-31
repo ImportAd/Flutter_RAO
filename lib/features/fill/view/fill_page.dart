@@ -478,7 +478,7 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
             child: SizedBox(height: 48, child: ElevatedButton(
               onPressed: () => _tabController?.animateTo(_tabController!.index + 1),
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceVariant,
-                  foregroundColor: AppColors.textPrimary,
+                  foregroundColor: AppColors.surface,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
               child: const Text('Далее'))))),
         ]),
@@ -488,7 +488,7 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
             Expanded(child: SizedBox(height: 48, child: ElevatedButton(
               onPressed: () => _tabController!.animateTo(_tabController!.index - 1),
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceVariant,
-                  foregroundColor: AppColors.textPrimary,
+                  foregroundColor: AppColors.surface,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
               child: const Text('Назад')))),
             const SizedBox(width: 12),
@@ -504,7 +504,7 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
     return SizedBox(height: 48, child: ElevatedButton(
       onPressed: _generating ? null : _generate,
       style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceVariant,
-          foregroundColor: AppColors.textPrimary, disabledBackgroundColor: AppColors.buttonDisabled,
+          foregroundColor: AppColors.surface, disabledBackgroundColor: AppColors.buttonDisabled,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
       child: _generating
           ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
