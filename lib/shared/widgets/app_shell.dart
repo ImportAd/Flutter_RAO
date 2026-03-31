@@ -72,16 +72,6 @@ class _Header extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 1200),
         child: Row(
           children: [
-            if (showBack) ...[
-              IconButton(
-                icon: const Icon(Icons.arrow_back_rounded, size: 20),
-                onPressed: onBack ?? () => Navigator.of(context).maybePop(),
-                color: AppColors.textSecondary,
-                tooltip: 'Назад',
-              ),
-              const SizedBox(width: 8),
-            ],
-
             // Навигация «Главная»
             HeaderNavLink(
               label: 'Главная',
@@ -95,17 +85,22 @@ class _Header extends StatelessWidget {
               label: 'Личный кабинет',
               onTap: () => GoRouter.of(context).go('/documents'),
             ),
+
+            // «Назад» — текстовая ссылка
+            if (showBack) ...[
+              const SizedBox(width: 20),
+              HeaderNavLink(
+                label: 'Назад',
+                onTap: onBack ?? () => Navigator.of(context).maybePop(),
+              ),
+            ],
+
             const Spacer(),
             if (title.isNotEmpty) ...[
-              // Padding(
-              //   padding: const EdgeInsets.symmetric(horizontal: 8),
-              //   child: Icon(Icons.chevron_right, size: 16, color: AppColors.textHint),
-              // ),
               Center(
                 child: Text(
                   title,
                   style: Theme.of(context).textTheme.titleMedium,
-                  // overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

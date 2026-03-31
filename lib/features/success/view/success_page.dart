@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
 import '../../../core/api/api_client.dart';
 import '../../../shared/widgets/app_shell.dart';
+import '../../../shared/widgets/header_nav_link.dart';
 
 class SuccessPage extends StatelessWidget {
   final String templateTitle, templateCode;
@@ -15,7 +16,9 @@ class SuccessPage extends StatelessWidget {
   const SuccessPage({super.key, required this.templateTitle, required this.templateCode,
       this.filename, this.aktFilename});
 
-  /// Одна кнопка — скачивает ЛД и автоматически АКТ (если есть)
+  bool get _hasAkt => aktFilename != null && aktFilename!.isNotEmpty;
+
+  /// Скачивает ЛД и автоматически АКТ (если есть)
   Future<void> _downloadAll(BuildContext context) async {
     final api = context.read<ApiClient>();
     try {
@@ -26,7 +29,6 @@ class SuccessPage extends StatelessWidget {
       // АКТ — автоматически вторым файлом
       if (aktFilename != null) {
         final aktBytes = await api.downloadFile(aktFilename!);
-        // Небольшая задержка чтобы браузер не заблокировал второе скачивание
         await Future.delayed(const Duration(milliseconds: 500));
         _saveBlobToFile(aktBytes, aktFilename!);
       }
@@ -59,18 +61,69 @@ class SuccessPage extends StatelessWidget {
             child: const Icon(Icons.check, size: 36, color: AppColors.primary)),
           const SizedBox(height: 28),
 
+          // Заголовок
           Text('Договор $templateTitle\nуспешно сформирован',
-              style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.center),
+              style: Theme.of(context).textTheme.headlineLarge,
+              textAlign: TextAlign.center),
+
+          // Информация об АКТе (если есть)
+          if (_hasAkt) ...[
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.description_outlined, size: 16, color: AppColors.textSecondary),
+                const SizedBox(width: 6),
+                Text(
+                  'Акт приема-передачи | ЭДО заполнены',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ],
+
           const SizedBox(height: 32),
 
-          // Одна кнопка «Скачать файл»
-          SizedBox(width: 340, height: 48, child: OutlinedButton(
-            onPressed: () => _downloadAll(context),
-            style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary,
-                side: const BorderSide(color: AppColors.primary),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
-            child: const Text('Скачать файл', style: TextStyle(fontSize: 15)),
-          )),
+          // Кнопка «Скачать файлы» + «На главную»
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 240,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () => _downloadAll(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                  ),
+                  child: Text(
+                    _hasAkt ? 'Скачать файлы' : 'Скачать файл',
+                    style: const TextStyle(fontSize: 15),
+                  ),
+                ),
+              ),
+              if (_hasAkt) ...[
+                const SizedBox(width: 20),
+                HeaderNavLink(
+                  label: 'На главную',
+                  onTap: () => context.go('/'),
+                ),
+              ],
+            ],
+          ),
+
+          // Если нет АКТа — простая ссылка на главную
+          if (!_hasAkt) ...[
+            const SizedBox(height: 12),
+            HeaderNavLink(
+              label: 'На главную',
+              onTap: () => context.go('/'),
+            ),
+          ],
 
           const SizedBox(height: 40),
           // Разделитель «или»

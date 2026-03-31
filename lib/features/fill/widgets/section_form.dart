@@ -80,7 +80,8 @@ class SectionForm extends StatelessWidget {
   }
 
   String? _hintForField(FieldModel field) {
-    const emptyHintFields = {'ld_num', 'add_num', 'ooo_name', 'dol'};
+    // Убрали ld_num и ooo_name — теперь они показывают label как hint
+    const emptyHintFields = {'add_num', 'dol'};
     if (emptyHintFields.contains(field.name)) return '';
     if (field.type == 'date') return 'формат 01.01.2025';
     if (field.textHandler == 'fio_full_and_initials') return 'Полностью';

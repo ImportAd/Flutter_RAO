@@ -99,6 +99,8 @@ class AppSecondaryButton extends StatelessWidget {
 }
 
 /// Кнопка-чип выбора (М.П. / Б.П., окончания -ий/-его)
+/// Кнопки растянуты на всю ширину: 2 кнопки = 50%, 4 = 25%
+/// Текст всегда белый на бирюзовом фоне
 class AppChoiceChips extends StatelessWidget {
   final List<String> options;
   final String? selected;
@@ -113,26 +115,43 @@ class AppChoiceChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: options.map((option) {
+    return Row(
+      children: options.asMap().entries.map((entry) {
+        final idx = entry.key;
+        final option = entry.value;
         final isSelected = option == selected;
-        return ChoiceChip(
-          label: Text(option),
-          selected: isSelected,
-          onSelected: (_) => onSelected(option),
-          backgroundColor: AppColors.surfaceVariant,
-          selectedColor: AppColors.primary,
-          labelStyle: TextStyle(
-            color: isSelected ? Colors.white : AppColors.textPrimary,
-            fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
-          ),
-          side: BorderSide(
-            color: isSelected ? AppColors.primary : AppColors.fieldBorder,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6),
+        final isFirst = idx == 0;
+        final isLast = idx == options.length - 1;
+
+        return Expanded(
+          child: GestureDetector(
+            onTap: () => onSelected(option),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.primary
+                    : AppColors.surfaceVariant,
+                borderRadius: BorderRadius.horizontal(
+                  left: isFirst ? const Radius.circular(6) : Radius.zero,
+                  right: isLast ? const Radius.circular(6) : Radius.zero,
+                ),
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : AppColors.surfaceVariant,
+                  width: 1,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                option,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  fontSize: 14,
+                ),
+              ),
+            ),
           ),
         );
       }).toList(),

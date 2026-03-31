@@ -272,24 +272,20 @@ class _HomePageState extends State<HomePage> {
               border: Border.all(color: AppColors.divider),
               borderRadius: BorderRadius.circular(4),
             ),
+            clipBehavior: Clip.antiAlias,
             child: IntrinsicHeight(
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   for (int i = 0; i < _recentDocs.length; i++) ...[
                     if (i > 0) VerticalDivider(width: 1, thickness: 1, color: AppColors.divider),
                     Expanded(
-                      child: InkWell(
+                      child: _RecentDocCell(
+                        title: _recentDocs[i]['template_title'] ?? _recentDocs[i]['template_code'] ?? '',
                         onTap: () {
                           final d = _recentDocs[i];
                           context.go('/fill/${d['template_code']}?fromDoc=${d['id']}');
                         },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                          child: Text(
-                            _recentDocs[i]['template_title'] ?? _recentDocs[i]['template_code'] ?? '',
-                            style: Theme.of(context).textTheme.bodyLarge,
-                          ),
-                        ),
                       ),
                     ),
                   ],
@@ -298,6 +294,39 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// Ячейка последнего документа — при наведении подсвечивается полностью
+class _RecentDocCell extends StatefulWidget {
+  final String title;
+  final VoidCallback onTap;
+  const _RecentDocCell({required this.title, required this.onTap});
+  @override
+  State<_RecentDocCell> createState() => _RecentDocCellState();
+}
+
+class _RecentDocCellState extends State<_RecentDocCell> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          color: _hovered ? AppColors.primary.withOpacity(0.08) : Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          child: Text(
+            widget.title,
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+        ),
+      ),
     );
   }
 }

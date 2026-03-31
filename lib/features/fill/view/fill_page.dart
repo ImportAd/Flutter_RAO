@@ -12,6 +12,7 @@ import '../widgets/table_form.dart';
 
 /// Маппинг: id табличной секции → имя months-поля из секции contract
 const _monthsFieldForTable = {
+  'objects': 'dg_months',
   'objects_a': 'dg_months_1',
   'objects_b': 'dg_months_2',
 };
