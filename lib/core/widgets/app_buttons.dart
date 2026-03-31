@@ -116,12 +116,14 @@ class AppChoiceChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: options.asMap().entries.map((entry) {
-        final idx = entry.key;
-        final option = entry.value;
+      children: List.generate(options.length * 2 - 1, (index) {
+        if (index.isOdd) {
+          return const SizedBox(width: 4);
+        }
+
+        final optionIndex = index ~/ 2;
+        final option = options[optionIndex];
         final isSelected = option == selected;
-        final isFirst = idx == 0;
-        final isLast = idx == options.length - 1;
 
         return Expanded(
           child: GestureDetector(
@@ -129,32 +131,42 @@ class AppChoiceChips extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primary
-                    : AppColors.surfaceVariant,
-                borderRadius: BorderRadius.horizontal(
-                  left: isFirst ? const Radius.circular(6) : Radius.zero,
-                  right: isLast ? const Radius.circular(6) : Radius.zero,
-                ),
+                color:
+                    isSelected ? AppColors.primary : AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: isSelected ? AppColors.primary : AppColors.surfaceVariant,
+                  color:
+                      isSelected ? AppColors.primary : AppColors.surfaceVariant,
                   width: 1,
                 ),
               ),
               alignment: Alignment.center,
-              child: Text(
-                option,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  fontSize: 14,
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isSelected) ...[
+                    const Icon(Icons.check, size: 16, color: Colors.white),
+                    const SizedBox(width: 6),
+                  ],
+                  Flexible(
+                    child: Text(
+                      option,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w400,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         );
-      }).toList(),
+      }),
     );
   }
 }
