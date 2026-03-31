@@ -10,6 +10,12 @@ import '../../../shared/widgets/app_shell.dart';
 import '../widgets/section_form.dart';
 import '../widgets/table_form.dart';
 
+/// Маппинг: id табличной секции → имя months-поля из секции contract
+const _monthsFieldForTable = {
+  'objects_a': 'dg_months_1',
+  'objects_b': 'dg_months_2',
+};
+
 class FillPage extends StatefulWidget {
   final String templateCode;
   final int? fromDocId;
@@ -28,14 +34,15 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
   final Map<String, List<Map<String, String>>> _tableAnswers = {};
   final Map<String, String> _errors = {};
 
-  /// Дефолты для колонок таблиц: {columnName: [val1, val2]}
   final Map<String, List<String>> _tableColumnDefaults = {};
 
-  /// Computed поля (пропускаем при рендеринге)
   final Set<String> _computedFieldNames = {
     'total_sum_num', 'total_kop', 'total_sum_words',
     'total_sum', 'sum_words',
   };
+
+  /// Поля, перенесённые из contract в другие табы (скрываем из contract)
+  final Set<String> _relocatedFieldNames = {};
 
   String _totalSumNum = '';
   String _totalKop = '';
@@ -54,8 +61,20 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
       final api = context.read<ApiClient>();
       final tmpl = await api.getTemplate(widget.templateCode);
 
-      // Добавляем computed fields из шаблона
       _computedFieldNames.addAll(tmpl.computedFields.map((s) => s.toLowerCase()));
+
+      // Определяем, какие months-поля нужно перенести
+      _relocatedFieldNames.clear();
+      final contractSec = tmpl.sections.where((s) => s.id == 'contract').firstOrNull;
+      if (contractSec != null) {
+        for (final entry in _monthsFieldForTable.entries) {
+          final tableSectionExists = tmpl.sections.any((s) => s.id == entry.key && s.table != null);
+          final fieldExists = contractSec.fields.any((f) => f.name == entry.value);
+          if (tableSectionExists && fieldExists) {
+            _relocatedFieldNames.add(entry.value);
+          }
+        }
+      }
 
       // Инициализируем ответы
       for (final sec in tmpl.sections) {
@@ -130,20 +149,33 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
     return alts.map((a) => '$sectionId.$a').toList();
   }
 
-  /// Секция считается «скрытой», если ВСЕ её поля — computed
   bool _isSectionHidden(SectionModel sec) {
-    if (sec.fields.isEmpty) return false; // у таблиц полей нет — не скрываем
+    if (sec.fields.isEmpty) return false;
     return sec.fields.every((f) => _computedFieldNames.contains(f.name));
+  }
+
+  /// Набор полей для пропуска при рендере конкретной секции
+  Set<String> _skipFieldsForSection(String sectionId) {
+    final skip = Set<String>.from(_computedFieldNames);
+    // Скрыть relocated months-поля из contract
+    if (sectionId == 'contract') {
+      skip.addAll(_relocatedFieldNames);
+    }
+    return skip;
   }
 
   List<_TabInfo> _buildTabs(TemplateDetail tmpl) {
     final tabs = <_TabInfo>[];
     for (final sec in tmpl.sections) {
-      // ── Пропускаем секции, где все поля — computed (totals) ──
       if (_isSectionHidden(sec)) continue;
 
       if (sec.fields.isNotEmpty) {
-        tabs.add(_TabInfo(sectionId: sec.id, title: sec.title, type: _TabType.fields));
+        // Проверяем: после скрытия relocated + computed полей остаётся ли что рендерить?
+        final skip = _skipFieldsForSection(sec.id);
+        final visibleCount = sec.fields.where((f) => !skip.contains(f.name)).length;
+        if (visibleCount > 0) {
+          tabs.add(_TabInfo(sectionId: sec.id, title: sec.title, type: _TabType.fields));
+        }
       }
       if (sec.table != null) {
         tabs.add(_TabInfo(sectionId: sec.id, title: sec.title, type: _TabType.table));
@@ -217,8 +249,9 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
         if (_computedFieldNames.contains(f.name)) continue;
         if (f.required) {
           var val = secAnswers[f.name]?.trim() ?? '';
-          // Маска даты с подчёркиваниями = пусто
           if (f.type == 'date' && val.contains('_')) val = '';
+          // Маска телефона с подчёркиваниями = пусто
+          if (f.name == 'phone' && val.contains('_')) val = '';
           if (val.isEmpty) {
             _errors['${sec.id}.${f.name}'] = 'Обязательное поле';
             msgs.add('${sec.title}: ${f.label}');
@@ -247,7 +280,6 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
         'fields': Map<String, dynamic>.from(_fieldAnswers),
         'tables': _tableAnswers,
       };
-      // Подставляем итоги (скрыты от пользователя, но отправляются на бэкенд)
       if (_totalSumNum.isNotEmpty) {
         (answers['fields'] as Map).putIfAbsent('totals', () => <String, String>{});
         final totals = (answers['fields'] as Map)['totals'];
@@ -289,6 +321,33 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
     ));
   }
 
+  // ──────────── Поиск months-поля для таблицы ────────────
+
+  /// Найти FieldModel для months-поля, привязанного к этой таблице
+  FieldModel? _findMonthsFieldForTable(TemplateDetail tmpl, String tableSectionId) {
+    final monthsFieldName = _monthsFieldForTable[tableSectionId];
+    if (monthsFieldName == null || !_relocatedFieldNames.contains(monthsFieldName)) return null;
+
+    final contractSec = tmpl.sections.where((s) => s.id == 'contract').firstOrNull;
+    if (contractSec == null) return null;
+
+    return contractSec.fields.where((f) => f.name == monthsFieldName).firstOrNull;
+  }
+
+  /// Виджет MonthsSelector для перенесённого поля (данные хранятся в contract)
+  Widget _buildRelocatedMonths(FieldModel field) {
+    final value = _fieldAnswers['contract']?[field.name] ?? '';
+    final errorKey = 'contract.${field.name}';
+    return MonthsSelector(
+      field: field,
+      value: value,
+      errorText: _errors[errorKey],
+      onChanged: (v) => _setFieldValue('contract', field.name, v),
+    );
+  }
+
+  // ──────────── Build ────────────
+
   @override
   Widget build(BuildContext context) {
     final tmpl = _template;
@@ -300,10 +359,9 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
     );
   }
 
-  // ──────────── Compact layout (маленькие шаблоны) ────────────
+  // ──────────── Compact layout ────────────
 
   Widget _buildCompact(TemplateDetail tmpl) {
-    // Фильтруем скрытые секции (totals и т.п.)
     final visibleSections = tmpl.sections.where((s) => !_isSectionHidden(s)).toList();
 
     return SingleChildScrollView(
@@ -314,16 +372,20 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
             Text(tmpl.menuTitle, style: Theme.of(context).textTheme.headlineMedium),
             const Divider(height: 32),
             for (final sec in visibleSections) ...[
-              if (sec.fields.isNotEmpty) SectionForm(section: sec,
-                  answers: _fieldAnswers[sec.id] ?? {}, errors: _errors,
-                  computedFields: _computedFieldNames,
-                  onFieldChanged: (n, v) => _setFieldValue(sec.id, n, v)),
-              if (sec.table != null)
+              if (sec.fields.isNotEmpty)
+                SectionForm(section: sec,
+                    answers: _fieldAnswers[sec.id] ?? {}, errors: _errors,
+                    computedFields: _skipFieldsForSection(sec.id),
+                    onFieldChanged: (n, v) => _setFieldValue(sec.id, n, v)),
+              if (sec.table != null) ...[
+                // Months-селектор над таблицей (если есть)
+                _buildMonthsAboveTable(tmpl, sec.id),
                 TableForm(section: sec, rows: _tableAnswers[sec.id] ?? [{}],
                     columnDefaults: _tableColumnDefaults,
                     onRowChanged: (i, r) => _setTableRow(sec.id, i, r),
                     onAddRow: () => _addTableRow(sec.id),
                     onRemoveRow: (i) => _removeTableRow(sec.id, i)),
+              ],
               const SizedBox(height: 16),
             ],
             const SizedBox(height: 24),
@@ -331,6 +393,16 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
           ]),
         )),
       )),
+    );
+  }
+
+  /// Построить MonthsSelector над таблицей (если поле перенесено)
+  Widget _buildMonthsAboveTable(TemplateDetail tmpl, String tableSectionId) {
+    final field = _findMonthsFieldForTable(tmpl, tableSectionId);
+    if (field == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: _buildRelocatedMonths(field),
     );
   }
 
@@ -350,7 +422,6 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
 
   Widget _buildTabContent(TemplateDetail tmpl, _TabInfo tab, {required bool isLast}) {
     final isTable = tab.type == _TabType.table;
-    // Таблицы — шире, меньше боковых отступов
     final maxW = isTable ? 1400.0 : 900.0;
     final hPad = isTable ? 16.0 : 24.0;
 
@@ -358,7 +429,6 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
       padding: EdgeInsets.symmetric(vertical: 32, horizontal: hPad),
       child: Center(child: ConstrainedBox(constraints: BoxConstraints(maxWidth: maxW),
         child: isTable
-            // Таблица без Card-обёртки для максимальной ширины
             ? Padding(
                 padding: const EdgeInsets.all(16),
                 child: _buildTabInner(tmpl, tab, isLast: isLast),
@@ -377,15 +447,18 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
 
       if (tab.type == _TabType.fields)
         SectionForm(section: sec, answers: _fieldAnswers[sec.id] ?? {},
-            errors: _errors, computedFields: _computedFieldNames,
+            errors: _errors, computedFields: _skipFieldsForSection(sec.id),
             onFieldChanged: (n, v) => _setFieldValue(sec.id, n, v)),
 
-      if (tab.type == _TabType.table)
+      if (tab.type == _TabType.table) ...[
+        // ── Months-селектор над таблицей ──
+        _buildMonthsAboveTable(tmpl, sec.id),
         TableForm(section: sec, rows: _tableAnswers[sec.id] ?? [{}],
             columnDefaults: _tableColumnDefaults,
             onRowChanged: (i, r) => _setTableRow(sec.id, i, r),
             onAddRow: () => _addTableRow(sec.id),
             onRemoveRow: (i) => _removeTableRow(sec.id, i)),
+      ],
 
       const SizedBox(height: 32),
 
@@ -397,7 +470,7 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
               child: SizedBox(height: 48, child: ElevatedButton(
                 onPressed: () => _tabController!.animateTo(_tabController!.index - 1),
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceVariant,
-                    foregroundColor: AppColors.surface,
+                    foregroundColor: AppColors.textPrimary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
                 child: const Text('Назад')))))
           else const Spacer(),
@@ -405,7 +478,7 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
             child: SizedBox(height: 48, child: ElevatedButton(
               onPressed: () => _tabController?.animateTo(_tabController!.index + 1),
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceVariant,
-                  foregroundColor: AppColors.surface,
+                  foregroundColor: AppColors.textPrimary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
               child: const Text('Далее'))))),
         ]),
@@ -431,7 +504,7 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
     return SizedBox(height: 48, child: ElevatedButton(
       onPressed: _generating ? null : _generate,
       style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceVariant,
-          foregroundColor: AppColors.surface, disabledBackgroundColor: AppColors.buttonDisabled,
+          foregroundColor: AppColors.textPrimary, disabledBackgroundColor: AppColors.buttonDisabled,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
       child: _generating
           ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../app/theme.dart';
 import '../../../core/models/template_models.dart';
+import '../widgets/section_form.dart' show DateMaskFormatter, dateToDisplay;
+
+/// Маркер для опции «Ввести вручную» в dropdown-ячейках
+const _kManualEntry = 'Ввести вручную';
 
 /// Таблица на всю ширину с dropdown-дефолтами для определённых колонок.
 class TableForm extends StatelessWidget {
@@ -36,7 +41,7 @@ class TableForm extends StatelessWidget {
             // ── Заголовки ──
             TableRow(
               decoration: const BoxDecoration(
-                color: Color(0xFFF7F7F7), // светло-серый, не бирюзовый
+                color: Color(0xFFF7F7F7),
               ),
               children: [
                 _HCell('№'),
@@ -47,9 +52,7 @@ class TableForm extends StatelessWidget {
             // ── Строки данных ──
             for (int i = 0; i < rows.length; i++)
               TableRow(
-                decoration: const BoxDecoration(
-                  color: Colors.white, // белый фон строк
-                ),
+                decoration: const BoxDecoration(color: Colors.white),
                 children: [
                   _DCell(
                     child: Padding(
@@ -99,7 +102,19 @@ class TableForm extends StatelessWidget {
     final currentVal = row[col.name] ?? '';
     final defaults = columnDefaults[col.name];
 
-    // Если есть дефолтные значения для этой колонки — показываем dropdown
+    // ── Колонки с type: date → маска __.__.____  ──
+    if (col.type == 'date') {
+      return _DateTableCell(
+        value: currentVal,
+        onChanged: (v) {
+          final newRow = Map<String, String>.from(row);
+          newRow[col.name] = v;
+          onRowChanged(rowIdx, newRow);
+        },
+      );
+    }
+
+    // ── Dropdown с дефолтами (включая «Ввести вручную») ──
     if (defaults != null && defaults.isNotEmpty) {
       return _DropdownCell(
         value: currentVal,
@@ -134,8 +149,8 @@ class TableForm extends StatelessWidget {
 
   Map<int, TableColumnWidth> _buildColumnWidths(List<TableColumnModel> columns) {
     final w = <int, TableColumnWidth>{};
-    w[0] = const FixedColumnWidth(42);                    // №
-    w[columns.length + 1] = const FixedColumnWidth(42);   // удалить
+    w[0] = const FixedColumnWidth(42);
+    w[columns.length + 1] = const FixedColumnWidth(42);
     for (int i = 0; i < columns.length; i++) {
       w[i + 1] = FlexColumnWidth(_flex(columns[i]));
     }
@@ -150,13 +165,73 @@ class TableForm extends StatelessWidget {
       case 'period_fee': return 1.3;
       case 'category': return 1.2;
       case 'tariff': return 1.2;
+      case 'start_date': return 1.4;
+      case 'payment_terms': return 1.4;
       default: return 1.5;
     }
   }
 }
 
-/// Ячейка с dropdown-выбором дефолтных значений
-class _DropdownCell extends StatelessWidget {
+
+// ══════════════════════════════════════════
+//  Ячейка даты в таблице (маска __.__.____) 
+// ══════════════════════════════════════════
+
+class _DateTableCell extends StatefulWidget {
+  final String value;
+  final ValueChanged<String> onChanged;
+  const _DateTableCell({required this.value, required this.onChanged});
+  @override
+  State<_DateTableCell> createState() => _DateTableCellState();
+}
+
+class _DateTableCellState extends State<_DateTableCell> {
+  late TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: dateToDisplay(widget.value));
+  }
+
+  @override
+  void didUpdateWidget(covariant _DateTableCell old) {
+    super.didUpdateWidget(old);
+    if (old.value != widget.value) {
+      final d = dateToDisplay(widget.value);
+      if (_ctrl.text != d) _ctrl.text = d;
+    }
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: TextFormField(
+        controller: _ctrl,
+        keyboardType: TextInputType.number,
+        inputFormatters: [DateMaskFormatter()],
+        decoration: const InputDecoration(
+          isDense: true,
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        ),
+        style: const TextStyle(fontSize: 15, letterSpacing: 1.2),
+        onChanged: widget.onChanged,
+      ),
+    );
+  }
+}
+
+
+// ══════════════════════════════════════════
+//  Dropdown-ячейка с поддержкой «Ввести вручную»
+// ══════════════════════════════════════════
+
+class _DropdownCell extends StatefulWidget {
   final String value;
   final List<String> options;
   final ValueChanged<String> onChanged;
@@ -164,26 +239,113 @@ class _DropdownCell extends StatelessWidget {
   const _DropdownCell({required this.value, required this.options, required this.onChanged});
 
   @override
+  State<_DropdownCell> createState() => _DropdownCellState();
+}
+
+class _DropdownCellState extends State<_DropdownCell> {
+  bool _manualMode = false;
+  late TextEditingController _ctrl;
+
+  /// Есть ли опция «Ввести вручную» в списке
+  bool get _hasManualOption =>
+      widget.options.any((o) => o.trim().toLowerCase() == _kManualEntry.toLowerCase());
+
+  /// Опции БЕЗ «Ввести вручную» (для dropdown)
+  List<String> get _realOptions =>
+      widget.options.where((o) => o.trim().toLowerCase() != _kManualEntry.toLowerCase()).toList();
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.value);
+    // Если текущее значение не среди реальных опций и не пустое — значит ручной ввод
+    if (widget.value.isNotEmpty && !_realOptions.contains(widget.value)) {
+      _manualMode = true;
+    }
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
   Widget build(BuildContext context) {
+    if (_manualMode) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _ctrl,
+                decoration: const InputDecoration(
+                  isDense: true,
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                  hintText: 'Введите значение',
+                  hintStyle: TextStyle(fontSize: 14, color: AppColors.textHint),
+                ),
+                style: const TextStyle(fontSize: 15),
+                onChanged: widget.onChanged,
+              ),
+            ),
+            GestureDetector(
+              onTap: () => setState(() {
+                _manualMode = false;
+                _ctrl.clear();
+                widget.onChanged('');
+              }),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(Icons.list, size: 18, color: AppColors.primary),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Обычный dropdown
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: PopupMenuButton<String>(
-        onSelected: onChanged,
+        onSelected: (v) {
+          if (v == _kManualEntry) {
+            setState(() {
+              _manualMode = true;
+              _ctrl.text = '';
+              widget.onChanged('');
+            });
+          } else {
+            widget.onChanged(v);
+          }
+        },
         tooltip: 'Выбрать значение',
         position: PopupMenuPosition.under,
-        itemBuilder: (_) => options.map((o) => PopupMenuItem(
-          value: o,
-          child: Text(o, style: const TextStyle(fontSize: 14)),
-        )).toList(),
+        itemBuilder: (_) {
+          final items = <PopupMenuEntry<String>>[];
+          for (final o in _realOptions) {
+            items.add(PopupMenuItem(value: o, child: Text(o, style: const TextStyle(fontSize: 14))));
+          }
+          // Добавляем «Ввести вручную» если есть в исходных опциях
+          if (_hasManualOption) {
+            items.add(const PopupMenuDivider());
+            items.add(PopupMenuItem(
+              value: _kManualEntry,
+              child: Text(_kManualEntry,
+                  style: TextStyle(fontSize: 14, color: AppColors.primary, fontWeight: FontWeight.w500)),
+            ));
+          }
+          return items;
+        },
         child: Container(
           constraints: const BoxConstraints(minHeight: 40),
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
           child: Row(children: [
             Expanded(child: Text(
-              value.isEmpty ? 'Выбрать' : value,
+              widget.value.isEmpty ? 'Выбрать' : widget.value,
               style: TextStyle(
                 fontSize: 15,
-                color: value.isEmpty ? AppColors.textHint : AppColors.textPrimary,
+                color: widget.value.isEmpty ? AppColors.textHint : AppColors.textPrimary,
               ),
               overflow: TextOverflow.ellipsis,
             )),
@@ -195,7 +357,11 @@ class _DropdownCell extends StatelessWidget {
   }
 }
 
-/// Ячейка заголовка
+
+// ══════════════════════════════════════════
+//  Helper cells
+// ══════════════════════════════════════════
+
 class _HCell extends StatelessWidget {
   final String text;
   const _HCell(this.text);
@@ -211,7 +377,6 @@ class _HCell extends StatelessWidget {
       );
 }
 
-/// Обёртка ячейки данных
 class _DCell extends StatelessWidget {
   final Widget child;
   const _DCell({required this.child});
