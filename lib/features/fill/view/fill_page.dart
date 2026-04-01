@@ -167,7 +167,6 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
 
   List<String> _columnAliases(String sectionId, String colName) {
     const aliases = {
-      'set': ['payment_terms'],
       'payment_order': ['payment_terms'],
       'punkt': ['category'],
       'staf': ['tariff'],
