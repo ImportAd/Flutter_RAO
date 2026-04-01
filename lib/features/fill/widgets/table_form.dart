@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../app/theme.dart';
 import '../../../core/models/template_models.dart';
+import '../../../core/utils/money_format.dart';
 import '../widgets/section_form.dart' show DateMaskFormatter, dateToDisplay;
 
 /// Маркер для опции «Ввести вручную» в dropdown-ячейках
@@ -14,11 +15,17 @@ class TableForm extends StatelessWidget {
   final void Function(int rowIndex, Map<String, String> row) onRowChanged;
   final VoidCallback onAddRow;
   final void Function(int rowIndex) onRemoveRow;
+
   /// Дефолтные значения для колонок: {columnName: [val1, val2, ...]}
   final Map<String, List<String>> columnDefaults;
 
-  const TableForm({super.key, required this.section, required this.rows,
-      required this.onRowChanged, required this.onAddRow, required this.onRemoveRow,
+  const TableForm(
+      {super.key,
+      required this.section,
+      required this.rows,
+      required this.onRowChanged,
+      required this.onAddRow,
+      required this.onRemoveRow,
       this.columnDefaults = const {}});
 
   @override
@@ -56,10 +63,12 @@ class TableForm extends StatelessWidget {
                 children: [
                   _DCell(
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 12),
                       child: Text(
                         '${i + 1}',
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w500),
                       ),
                     ),
                   ),
@@ -71,7 +80,8 @@ class TableForm extends StatelessWidget {
                             icon: const Icon(Icons.delete_outline, size: 18),
                             color: AppColors.error,
                             padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                            constraints: const BoxConstraints(
+                                minWidth: 36, minHeight: 36),
                             onPressed: () => onRemoveRow(i),
                           )
                         : const SizedBox(width: 36),
@@ -80,16 +90,15 @@ class TableForm extends StatelessWidget {
               ),
           ],
         ),
-
         const SizedBox(height: 12),
-
         if (table.allowDynamicRows && rows.length < table.maxRows)
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
               onPressed: onAddRow,
               icon: const Icon(Icons.add, size: 18),
-              label: const Text('Добавить строку', style: TextStyle(fontSize: 15)),
+              label:
+                  const Text('Добавить строку', style: TextStyle(fontSize: 15)),
               style: TextButton.styleFrom(foregroundColor: AppColors.primary),
             ),
           ),
@@ -159,7 +168,8 @@ class TableForm extends StatelessWidget {
     );
   }
 
-  Map<int, TableColumnWidth> _buildColumnWidths(List<TableColumnModel> columns) {
+  Map<int, TableColumnWidth> _buildColumnWidths(
+      List<TableColumnModel> columns) {
     final w = <int, TableColumnWidth>{};
     w[0] = const FixedColumnWidth(42);
     w[columns.length + 1] = const FixedColumnWidth(42);
@@ -171,123 +181,48 @@ class TableForm extends StatelessWidget {
 
   double _flex(TableColumnModel col) {
     switch (col.name) {
-      case 'name': case 'address': return 2.5;
-      case 'punkt': return 0.7;
-      case 'area': case 'staf': case 'sum': case 'reg': case 'set': return 1.0;
-      case 'period_fee': return 1.3;
-      case 'category': return 1.2;
-      case 'tariff': return 1.2;
-      case 'start_date': return 1.4;
-      case 'payment_terms': return 1.4;
-      default: return 1.5;
+      case 'name':
+      case 'address':
+        return 2.5;
+      case 'punkt':
+        return 0.7;
+      case 'area':
+      case 'staf':
+      case 'sum':
+      case 'reg':
+      case 'set':
+        return 1.0;
+      case 'period_fee':
+        return 1.3;
+      case 'category':
+        return 1.2;
+      case 'tariff':
+        return 1.2;
+      case 'start_date':
+        return 1.4;
+      case 'payment_terms':
+        return 1.4;
+      default:
+        return 1.5;
     }
   }
 }
 
-
 // ══════════════════════════════════════════
-//  Маска денег: 1 234 567,89
+//  Режим ввода денег: 1234,56
 // ══════════════════════════════════════════
 
-class _MoneyMaskFormatter extends TextInputFormatter {
+class _MoneyEditFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
       TextEditingValue oldValue, TextEditingValue newValue) {
-    // Убираем всё кроме цифр и запятой/точки
-    var raw = newValue.text.replaceAll(RegExp(r'[^\d,.]'), '');
-
-    // Заменяем точку на запятую для единообразия
-    raw = raw.replaceAll('.', ',');
-
-    // Только одна запятая
-    final commaIdx = raw.indexOf(',');
-    if (commaIdx >= 0) {
-      final before = raw.substring(0, commaIdx).replaceAll(',', '');
-      var after = raw.substring(commaIdx + 1).replaceAll(',', '');
-      // Максимум 2 знака после запятой
-      if (after.length > 2) after = after.substring(0, 2);
-      raw = '$before,$after';
-    }
-
-    // Разделяем на целую и дробную части
-    String intPart;
-    String decPart;
-    if (raw.contains(',')) {
-      final parts = raw.split(',');
-      intPart = parts[0];
-      decPart = parts.length > 1 ? parts[1] : '';
-    } else {
-      intPart = raw;
-      decPart = '';
-    }
-
-    // Убираем ведущие нули (но оставляем один ноль если строка пустая)
-    if (intPart.length > 1) {
-      intPart = intPart.replaceFirst(RegExp(r'^0+'), '');
-      if (intPart.isEmpty) intPart = '0';
-    }
-    if (intPart.isEmpty && decPart.isEmpty && !raw.contains(',')) {
-      return const TextEditingValue(
-        text: '',
-        selection: TextSelection.collapsed(offset: 0),
-      );
-    }
-    if (intPart.isEmpty) intPart = '0';
-
-    // Форматируем целую часть с пробелами
-    final formatted = StringBuffer();
-    for (int i = 0; i < intPart.length; i++) {
-      if (i > 0 && (intPart.length - i) % 3 == 0) {
-        formatted.write(' ');
-      }
-      formatted.write(intPart[i]);
-    }
-
-    String text = formatted.toString();
-    if (raw.contains(',')) {
-      text = '$text,$decPart';
-    }
+    final text = normalizeMoneyEditable(newValue.text);
 
     return TextEditingValue(
       text: text,
       selection: TextSelection.collapsed(offset: text.length),
     );
   }
-}
-
-/// Преобразовать отформатированное значение обратно в число-строку для расчётов
-String _moneyToRaw(String formatted) {
-  return formatted.replaceAll(' ', '').replaceAll(',', '.');
-}
-
-/// Отформатировать «сырое» значение в маску
-String _moneyToDisplay(String raw) {
-  if (raw.isEmpty) return '';
-
-  // Нормализуем
-  var s = raw.replaceAll(' ', '').replaceAll('\u00A0', '').replaceAll(',', '.');
-
-  // Парсим
-  final val = double.tryParse(s);
-  if (val == null) return raw;
-
-  final rub = val.truncate();
-  final kop = ((val - rub) * 100).round();
-
-  // Форматируем целую часть с пробелами
-  final rubStr = rub.toString();
-  final buf = StringBuffer();
-  for (int i = 0; i < rubStr.length; i++) {
-    if (i > 0 && (rubStr.length - i) % 3 == 0) {
-      buf.write(' ');
-    }
-    buf.write(rubStr[i]);
-  }
-
-  if (kop > 0 || raw.contains('.') || raw.contains(',')) {
-    return '${buf.toString()},${kop.toString().padLeft(2, '0')}';
-  }
-  return buf.toString();
 }
 
 class _MoneyTableCell extends StatefulWidget {
@@ -300,24 +235,54 @@ class _MoneyTableCell extends StatefulWidget {
 
 class _MoneyTableCellState extends State<_MoneyTableCell> {
   late TextEditingController _ctrl;
+  late FocusNode _focusNode;
+  late String _rawValue;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = TextEditingController(text: _moneyToDisplay(widget.value));
+    _rawValue = moneyToRaw(widget.value);
+    _ctrl = TextEditingController(text: moneyToDisplay(_rawValue));
+    _focusNode = FocusNode()..addListener(_handleFocusChange);
   }
 
   @override
   void didUpdateWidget(covariant _MoneyTableCell old) {
     super.didUpdateWidget(old);
     if (old.value != widget.value) {
-      final d = _moneyToDisplay(widget.value);
-      if (_ctrl.text != d) _ctrl.text = d;
+      _rawValue = moneyToRaw(widget.value);
+      final nextText = _focusNode.hasFocus
+          ? moneyToEditable(_rawValue)
+          : moneyToDisplay(_rawValue);
+      _setControllerText(nextText);
     }
   }
 
+  void _handleFocusChange() {
+    if (_focusNode.hasFocus) {
+      _setControllerText(moneyToEditable(_rawValue));
+      return;
+    }
+
+    _rawValue = moneyToRaw(_ctrl.text);
+    widget.onChanged(_rawValue);
+    _setControllerText(moneyToDisplay(_rawValue));
+  }
+
+  void _setControllerText(String text) {
+    if (_ctrl.text == text) return;
+    _ctrl.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _focusNode.dispose();
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -325,28 +290,28 @@ class _MoneyTableCellState extends State<_MoneyTableCell> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: TextFormField(
         controller: _ctrl,
-        keyboardType: TextInputType.number,
-        inputFormatters: [_MoneyMaskFormatter()],
+        focusNode: _focusNode,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [_MoneyEditFormatter()],
         decoration: const InputDecoration(
           isDense: true,
           border: InputBorder.none,
           contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-          hintText: '0',
+          hintText: '_____,__',
           hintStyle: TextStyle(fontSize: 15, color: AppColors.textHint),
         ),
         style: const TextStyle(fontSize: 15, letterSpacing: 0.5),
-        onChanged: (formatted) {
-          // Передаём «сырое» значение для расчётов
-          widget.onChanged(formatted);
+        onChanged: (editable) {
+          _rawValue = moneyToRaw(editable);
+          widget.onChanged(_rawValue);
         },
       ),
     );
   }
 }
 
-
 // ══════════════════════════════════════════
-//  Ячейка даты в таблице (маска __.__.____) 
+//  Ячейка даты в таблице (маска __.__.____)
 // ══════════════════════════════════════════
 
 class _DateTableCell extends StatefulWidget {
@@ -376,7 +341,10 @@ class _DateTableCellState extends State<_DateTableCell> {
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -398,7 +366,6 @@ class _DateTableCellState extends State<_DateTableCell> {
   }
 }
 
-
 // ══════════════════════════════════════════
 //  Dropdown-ячейка с поддержкой «Ввести вручную»
 // ══════════════════════════════════════════
@@ -408,7 +375,8 @@ class _DropdownCell extends StatefulWidget {
   final List<String> options;
   final ValueChanged<String> onChanged;
 
-  const _DropdownCell({required this.value, required this.options, required this.onChanged});
+  const _DropdownCell(
+      {required this.value, required this.options, required this.onChanged});
 
   @override
   State<_DropdownCell> createState() => _DropdownCellState();
@@ -419,12 +387,13 @@ class _DropdownCellState extends State<_DropdownCell> {
   late TextEditingController _ctrl;
 
   /// Есть ли опция «Ввести вручную» в списке
-  bool get _hasManualOption =>
-      widget.options.any((o) => o.trim().toLowerCase() == _kManualEntry.toLowerCase());
+  bool get _hasManualOption => widget.options
+      .any((o) => o.trim().toLowerCase() == _kManualEntry.toLowerCase());
 
   /// Опции БЕЗ «Ввести вручную» (для dropdown)
-  List<String> get _realOptions =>
-      widget.options.where((o) => o.trim().toLowerCase() != _kManualEntry.toLowerCase()).toList();
+  List<String> get _realOptions => widget.options
+      .where((o) => o.trim().toLowerCase() != _kManualEntry.toLowerCase())
+      .toList();
 
   @override
   void initState() {
@@ -437,7 +406,10 @@ class _DropdownCellState extends State<_DropdownCell> {
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -452,7 +424,8 @@ class _DropdownCellState extends State<_DropdownCell> {
                 decoration: const InputDecoration(
                   isDense: true,
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 4, vertical: 10),
                   hintText: 'Введите значение',
                   hintStyle: TextStyle(fontSize: 14, color: AppColors.textHint),
                 ),
@@ -496,7 +469,9 @@ class _DropdownCellState extends State<_DropdownCell> {
         itemBuilder: (_) {
           final items = <PopupMenuEntry<String>>[];
           for (final o in _realOptions) {
-            items.add(PopupMenuItem(value: o, child: Text(o, style: const TextStyle(fontSize: 14))));
+            items.add(PopupMenuItem(
+                value: o,
+                child: Text(o, style: const TextStyle(fontSize: 14))));
           }
           // Добавляем «Ввести вручную» если есть в исходных опциях
           if (_hasManualOption) {
@@ -504,7 +479,10 @@ class _DropdownCellState extends State<_DropdownCell> {
             items.add(PopupMenuItem(
               value: _kManualEntry,
               child: Text(_kManualEntry,
-                  style: TextStyle(fontSize: 14, color: AppColors.primary, fontWeight: FontWeight.w500)),
+                  style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w500)),
             ));
           }
           return items;
@@ -513,11 +491,14 @@ class _DropdownCellState extends State<_DropdownCell> {
           constraints: const BoxConstraints(minHeight: 40),
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
           child: Row(children: [
-            Expanded(child: Text(
+            Expanded(
+                child: Text(
               widget.value.isEmpty ? 'Выбрать' : widget.value,
               style: TextStyle(
                 fontSize: 15,
-                color: widget.value.isEmpty ? AppColors.textHint : AppColors.textPrimary,
+                color: widget.value.isEmpty
+                    ? AppColors.textHint
+                    : AppColors.textPrimary,
               ),
               overflow: TextOverflow.ellipsis,
             )),
@@ -528,7 +509,6 @@ class _DropdownCellState extends State<_DropdownCell> {
     );
   }
 }
-
 
 // ══════════════════════════════════════════
 //  Helper cells

@@ -125,12 +125,13 @@ class AppChoiceChips extends StatelessWidget {
 
   Widget _buildHorizontal() {
     return Row(
-      children: options.asMap().entries.map((entry) {
-        final idx = entry.key;
-        final option = entry.value;
+      children: List.generate(options.length * 2 - 1, (index) {
+        if (index.isOdd) {
+          return const SizedBox(width: 4);
+        }
+
+        final option = options[index ~/ 2];
         final isSelected = option == selected;
-        final isFirst = idx == 0;
-        final isLast = idx == options.length - 1;
 
         return Expanded(
           child: GestureDetector(
@@ -141,10 +142,7 @@ class AppChoiceChips extends StatelessWidget {
                 color: isSelected
                     ? const Color(0xFF01909B)
                     : const Color(0xFFD3D3D3),
-                borderRadius: BorderRadius.horizontal(
-                  left: isFirst ? const Radius.circular(6) : Radius.zero,
-                  right: isLast ? const Radius.circular(6) : Radius.zero,
-                ),
+                borderRadius: BorderRadius.circular(8),
               ),
               alignment: Alignment.center,
               child: Text(
@@ -168,12 +166,13 @@ class AppChoiceChips extends StatelessWidget {
   Widget _buildVertical() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: options.asMap().entries.map((entry) {
-        final idx = entry.key;
-        final option = entry.value;
+      children: List.generate(options.length * 2 - 1, (index) {
+        if (index.isOdd) {
+          return const SizedBox(height: 4);
+        }
+
+        final option = options[index ~/ 2];
         final isSelected = option == selected;
-        final isFirst = idx == 0;
-        final isLast = idx == options.length - 1;
 
         return GestureDetector(
           onTap: () => onSelected(option),
@@ -184,10 +183,7 @@ class AppChoiceChips extends StatelessWidget {
               color: isSelected
                   ? const Color(0xFF01909B)
                   : const Color(0xFFD3D3D3),
-              borderRadius: BorderRadius.vertical(
-                top: isFirst ? const Radius.circular(6) : Radius.zero,
-                bottom: isLast ? const Radius.circular(6) : Radius.zero,
-              ),
+              borderRadius: BorderRadius.circular(8),
             ),
             alignment: Alignment.centerLeft,
             child: Text(

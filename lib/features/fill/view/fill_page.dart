@@ -1,10 +1,10 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/models/template_models.dart';
+import '../../../core/utils/money_format.dart';
 import '../../../core/utils/number_to_words_ru.dart';
 import '../../../shared/widgets/app_shell.dart';
 import '../widgets/section_form.dart';
@@ -38,8 +38,11 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
   final Map<String, List<String>> _tableColumnDefaults = {};
 
   final Set<String> _computedFieldNames = {
-    'total_sum_num', 'total_kop', 'total_sum_words',
-    'total_sum', 'sum_words',
+    'total_sum_num',
+    'total_kop',
+    'total_sum_words',
+    'total_sum',
+    'sum_words',
   };
 
   /// Поля, перенесённые из contract в другие табы (скрываем из contract)
@@ -52,25 +55,35 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
   TabController? _tabController;
 
   @override
-  void initState() { super.initState(); _loadTemplate(); }
+  void initState() {
+    super.initState();
+    _loadTemplate();
+  }
 
   @override
-  void dispose() { _tabController?.dispose(); super.dispose(); }
+  void dispose() {
+    _tabController?.dispose();
+    super.dispose();
+  }
 
   Future<void> _loadTemplate() async {
     try {
       final api = context.read<ApiClient>();
       final tmpl = await api.getTemplate(widget.templateCode);
 
-      _computedFieldNames.addAll(tmpl.computedFields.map((s) => s.toLowerCase()));
+      _computedFieldNames
+          .addAll(tmpl.computedFields.map((s) => s.toLowerCase()));
 
       // Определяем, какие months-поля нужно перенести
       _relocatedFieldNames.clear();
-      final contractSec = tmpl.sections.where((s) => s.id == 'contract').firstOrNull;
+      final contractSec =
+          tmpl.sections.where((s) => s.id == 'contract').firstOrNull;
       if (contractSec != null) {
         for (final entry in _monthsFieldForTable.entries) {
-          final tableSectionExists = tmpl.sections.any((s) => s.id == entry.key && s.table != null);
-          final fieldExists = contractSec.fields.any((f) => f.name == entry.value);
+          final tableSectionExists =
+              tmpl.sections.any((s) => s.id == entry.key && s.table != null);
+          final fieldExists =
+              contractSec.fields.any((f) => f.name == entry.value);
           if (tableSectionExists && fieldExists) {
             _relocatedFieldNames.add(entry.value);
           }
@@ -91,12 +104,18 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
             final key = '${sec.id}.${col.name}';
             try {
               final vals = await api.getSystemDefaults(key);
-              if (vals.isNotEmpty) { _tableColumnDefaults[col.name] = vals; continue; }
+              if (vals.isNotEmpty) {
+                _tableColumnDefaults[col.name] = vals;
+                continue;
+              }
             } catch (_) {}
             for (final alias in _columnAliases(sec.id, col.name)) {
               try {
                 final vals = await api.getSystemDefaults(alias);
-                if (vals.isNotEmpty) { _tableColumnDefaults[col.name] = vals; break; }
+                if (vals.isNotEmpty) {
+                  _tableColumnDefaults[col.name] = vals;
+                  break;
+                }
               } catch (_) {}
             }
           }
@@ -112,15 +131,16 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
           final oldTables = oldAnswers['tables'] as Map<String, dynamic>? ?? {};
           for (final e in oldFields.entries) {
             if (e.value is Map) {
-              _fieldAnswers[e.key] = Map<String, String>.from(
-                  (e.value as Map).map((k, v) => MapEntry(k.toString(), v.toString())));
+              _fieldAnswers[e.key] = Map<String, String>.from((e.value as Map)
+                  .map((k, v) => MapEntry(k.toString(), v.toString())));
             }
           }
           for (final e in oldTables.entries) {
             if (e.value is List) {
               _tableAnswers[e.key] = (e.value as List)
-                  .map((r) => Map<String, String>.from(
-                      (r as Map).map((k, v) => MapEntry(k.toString(), v.toString()))))
+                  .map((r) => _normalizeTableRow(Map<String, String>.from((r
+                          as Map)
+                      .map((k, v) => MapEntry(k.toString(), v.toString())))))
                   .toList();
             }
           }
@@ -133,9 +153,15 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
       }
 
       _recalcTotals();
-      setState(() { _template = tmpl; _loading = false; });
+      setState(() {
+        _template = tmpl;
+        _loading = false;
+      });
     } catch (e) {
-      setState(() { _error = '$e'; _loading = false; });
+      setState(() {
+        _error = '$e';
+        _loading = false;
+      });
     }
   }
 
@@ -173,13 +199,16 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
       if (sec.fields.isNotEmpty) {
         // Проверяем: после скрытия relocated + computed полей остаётся ли что рендерить?
         final skip = _skipFieldsForSection(sec.id);
-        final visibleCount = sec.fields.where((f) => !skip.contains(f.name)).length;
+        final visibleCount =
+            sec.fields.where((f) => !skip.contains(f.name)).length;
         if (visibleCount > 0) {
-          tabs.add(_TabInfo(sectionId: sec.id, title: sec.title, type: _TabType.fields));
+          tabs.add(_TabInfo(
+              sectionId: sec.id, title: sec.title, type: _TabType.fields));
         }
       }
       if (sec.table != null) {
-        tabs.add(_TabInfo(sectionId: sec.id, title: sec.title, type: _TabType.table));
+        tabs.add(_TabInfo(
+            sectionId: sec.id, title: sec.title, type: _TabType.table));
       }
     }
     return tabs;
@@ -196,19 +225,25 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
   void _setTableRow(String sectionId, int rowIndex, Map<String, String> row) {
     setState(() {
       _tableAnswers.putIfAbsent(sectionId, () => []);
-      while (_tableAnswers[sectionId]!.length <= rowIndex) _tableAnswers[sectionId]!.add({});
-      _tableAnswers[sectionId]![rowIndex] = row;
+      while (_tableAnswers[sectionId]!.length <= rowIndex) {
+        _tableAnswers[sectionId]!.add({});
+      }
+      _tableAnswers[sectionId]![rowIndex] = _normalizeTableRow(row);
       _recalcTotals();
     });
   }
 
   void _addTableRow(String sectionId) {
-    setState(() { _tableAnswers.putIfAbsent(sectionId, () => []); _tableAnswers[sectionId]!.add({}); });
+    setState(() {
+      _tableAnswers.putIfAbsent(sectionId, () => []);
+      _tableAnswers[sectionId]!.add({});
+    });
   }
 
   void _removeTableRow(String sectionId, int index) {
     setState(() {
-      if (_tableAnswers[sectionId] != null && _tableAnswers[sectionId]!.length > 1) {
+      if (_tableAnswers[sectionId] != null &&
+          _tableAnswers[sectionId]!.length > 1) {
         _tableAnswers[sectionId]!.removeAt(index);
         _recalcTotals();
       }
@@ -222,8 +257,11 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
       for (final row in entry.value) {
         final raw = row['period_fee'] ?? '';
         if (raw.isEmpty) continue;
-        final val = double.tryParse(raw.replaceAll(',', '.').replaceAll(' ', '').replaceAll('\u00A0', ''));
-        if (val != null) { total += val; hasAny = true; }
+        final val = parseMoney(raw);
+        if (val != null) {
+          total += val;
+          hasAny = true;
+        }
       }
     }
     if (hasAny) {
@@ -272,17 +310,21 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
 
   Future<void> _generate() async {
     final missing = _validateAll();
-    if (missing.isNotEmpty) { _showValidationErrors(missing); return; }
+    if (missing.isNotEmpty) {
+      _showValidationErrors(missing);
+      return;
+    }
 
     setState(() => _generating = true);
     try {
       final api = context.read<ApiClient>();
       final answers = <String, dynamic>{
         'fields': Map<String, dynamic>.from(_fieldAnswers),
-        'tables': _tableAnswers,
+        'tables': _buildRequestTables(),
       };
       if (_totalSumNum.isNotEmpty) {
-        (answers['fields'] as Map).putIfAbsent('totals', () => <String, String>{});
+        (answers['fields'] as Map)
+            .putIfAbsent('totals', () => <String, String>{});
         final totals = (answers['fields'] as Map)['totals'];
         if (totals is Map) {
           totals['total_sum_num'] = _totalSumNum;
@@ -291,48 +333,106 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
         }
       }
 
-      final result = await api.generateDocument(templateCode: widget.templateCode, answers: answers);
+      final result = await api.generateDocument(
+          templateCode: widget.templateCode, answers: answers);
       if (mounted) {
         context.go('/success', extra: {
-          'title': _template!.menuTitle, 'code': _template!.code,
-          'filename': result['filename'], 'akt_filename': result['akt_filename'],
+          'title': _template!.menuTitle,
+          'code': _template!.code,
+          'filename': result['filename'],
+          'akt_filename': result['akt_filename'],
         });
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      }
     } finally {
-      if (mounted) setState(() => _generating = false);
+      if (mounted) {
+        setState(() => _generating = false);
+      }
     }
   }
 
+  Map<String, String> _normalizeTableRow(Map<String, String> row) {
+    final normalized = Map<String, String>.from(row);
+    final rawPeriodFee = moneyToRaw(normalized['period_fee'] ?? '');
+
+    if (rawPeriodFee.isEmpty) {
+      normalized.remove('period_fee');
+    } else {
+      normalized['period_fee'] = rawPeriodFee;
+    }
+
+    return normalized;
+  }
+
+  Map<String, List<Map<String, String>>> _buildRequestTables() {
+    return {
+      for (final entry in _tableAnswers.entries)
+        entry.key: entry.value.map((row) {
+          final serialized = Map<String, String>.from(row);
+          final rawPeriodFee = serialized['period_fee'] ?? '';
+          if (rawPeriodFee.isNotEmpty) {
+            serialized['period_fee'] = moneyToDisplay(rawPeriodFee);
+          }
+          return serialized;
+        }).toList(),
+    };
+  }
+
   void _showValidationErrors(List<String> fields) {
-    showDialog(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('Не заполнены обязательные поля'),
-      content: SizedBox(width: 400, child: SingleChildScrollView(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min,
-          children: fields.map((f) => Padding(padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(children: [
-              Icon(Icons.warning_amber, size: 16, color: AppColors.error),
-              const SizedBox(width: 8),
-              Expanded(child: Text(f, style: const TextStyle(fontSize: 14))),
-            ]),
-          )).toList()),
-      )),
-      actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Понятно'))],
-    ));
+    showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+              title: const Text('Не заполнены обязательные поля'),
+              content: SizedBox(
+                  width: 400,
+                  child: SingleChildScrollView(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: fields
+                            .map((f) => Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(children: [
+                                    Icon(Icons.warning_amber,
+                                        size: 16, color: AppColors.error),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                        child: Text(f,
+                                            style:
+                                                const TextStyle(fontSize: 14))),
+                                  ]),
+                                ))
+                            .toList()),
+                  )),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Понятно'))
+              ],
+            ));
   }
 
   // ──────────── Поиск months-поля для таблицы ────────────
 
   /// Найти FieldModel для months-поля, привязанного к этой таблице
-  FieldModel? _findMonthsFieldForTable(TemplateDetail tmpl, String tableSectionId) {
+  FieldModel? _findMonthsFieldForTable(
+      TemplateDetail tmpl, String tableSectionId) {
     final monthsFieldName = _monthsFieldForTable[tableSectionId];
-    if (monthsFieldName == null || !_relocatedFieldNames.contains(monthsFieldName)) return null;
+    if (monthsFieldName == null ||
+        !_relocatedFieldNames.contains(monthsFieldName)) return null;
 
-    final contractSec = tmpl.sections.where((s) => s.id == 'contract').firstOrNull;
+    final contractSec =
+        tmpl.sections.where((s) => s.id == 'contract').firstOrNull;
     if (contractSec == null) return null;
 
-    return contractSec.fields.where((f) => f.name == monthsFieldName).firstOrNull;
+    return contractSec.fields
+        .where((f) => f.name == monthsFieldName)
+        .firstOrNull;
   }
 
   /// Виджет MonthsSelector для перенесённого поля (данные хранятся в contract)
@@ -352,36 +452,55 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final tmpl = _template;
-    return AppShell(title: tmpl?.menuTitle ?? 'Загрузка...', showBack: true,
+    return AppShell(
+      title: tmpl?.menuTitle ?? 'Загрузка...',
+      showBack: true,
       onBack: () => context.go('/'),
-      child: _loading ? const Center(child: CircularProgressIndicator())
-          : _error != null ? Center(child: Text(_error!, style: TextStyle(color: AppColors.error)))
-          : tmpl!.isCompact ? _buildCompact(tmpl) : _buildTabbed(tmpl),
+      child: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child:
+                      Text(_error!, style: TextStyle(color: AppColors.error)))
+              : tmpl!.isCompact
+                  ? _buildCompact(tmpl)
+                  : _buildTabbed(tmpl),
     );
   }
 
   // ──────────── Compact layout ────────────
 
   Widget _buildCompact(TemplateDetail tmpl) {
-    final visibleSections = tmpl.sections.where((s) => !_isSectionHidden(s)).toList();
+    final visibleSections =
+        tmpl.sections.where((s) => !_isSectionHidden(s)).toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-      child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 900),
-        child: Card(child: Padding(padding: const EdgeInsets.all(32),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text(tmpl.menuTitle, style: Theme.of(context).textTheme.headlineMedium),
+      child: Center(
+          child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 900),
+        child: Card(
+            child: Padding(
+          padding: const EdgeInsets.all(32),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(tmpl.menuTitle,
+                style: Theme.of(context).textTheme.headlineMedium),
             const Divider(height: 32),
             for (final sec in visibleSections) ...[
               if (sec.fields.isNotEmpty)
-                SectionForm(section: sec,
-                    answers: _fieldAnswers[sec.id] ?? {}, errors: _errors,
+                SectionForm(
+                    section: sec,
+                    answers: _fieldAnswers[sec.id] ?? {},
+                    errors: _errors,
                     computedFields: _skipFieldsForSection(sec.id),
                     onFieldChanged: (n, v) => _setFieldValue(sec.id, n, v)),
               if (sec.table != null) ...[
                 // Months-селектор над таблицей (если есть)
                 _buildMonthsAboveTable(tmpl, sec.id),
-                TableForm(section: sec, rows: _tableAnswers[sec.id] ?? [{}],
+                TableForm(
+                    section: sec,
+                    rows: _tableAnswers[sec.id] ?? [{}],
                     columnDefaults: _tableColumnDefaults,
                     onRowChanged: (i, r) => _setTableRow(sec.id, i, r),
                     onAddRow: () => _addTableRow(sec.id),
@@ -412,49 +531,69 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
   Widget _buildTabbed(TemplateDetail tmpl) {
     final tabs = _buildTabs(tmpl);
     return Column(children: [
-      Container(color: AppColors.surface, child: TabBar(
-        controller: _tabController, isScrollable: false,
-        tabs: tabs.map((t) => Tab(text: t.title)).toList())),
-      Expanded(child: TabBarView(controller: _tabController,
-        children: tabs.asMap().entries.map((e) =>
-            _buildTabContent(tmpl, e.value, isLast: e.key == tabs.length - 1)).toList())),
+      Container(
+          color: AppColors.surface,
+          child: TabBar(
+              controller: _tabController,
+              isScrollable: false,
+              tabs: tabs.map((t) => Tab(text: t.title)).toList())),
+      Expanded(
+          child: TabBarView(
+              controller: _tabController,
+              children: tabs
+                  .asMap()
+                  .entries
+                  .map((e) => _buildTabContent(tmpl, e.value,
+                      isLast: e.key == tabs.length - 1))
+                  .toList())),
     ]);
   }
 
-  Widget _buildTabContent(TemplateDetail tmpl, _TabInfo tab, {required bool isLast}) {
+  Widget _buildTabContent(TemplateDetail tmpl, _TabInfo tab,
+      {required bool isLast}) {
     final isTable = tab.type == _TabType.table;
     final maxW = isTable ? 1400.0 : 900.0;
     final hPad = isTable ? 16.0 : 24.0;
 
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(vertical: 32, horizontal: hPad),
-      child: Center(child: ConstrainedBox(constraints: BoxConstraints(maxWidth: maxW),
+      child: Center(
+          child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxW),
         child: isTable
             ? Padding(
                 padding: const EdgeInsets.all(16),
                 child: _buildTabInner(tmpl, tab, isLast: isLast),
               )
-            : Card(child: Padding(padding: const EdgeInsets.all(32),
-                child: _buildTabInner(tmpl, tab, isLast: isLast))),
+            : Card(
+                child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: _buildTabInner(tmpl, tab, isLast: isLast))),
       )),
     );
   }
 
-  Widget _buildTabInner(TemplateDetail tmpl, _TabInfo tab, {required bool isLast}) {
+  Widget _buildTabInner(TemplateDetail tmpl, _TabInfo tab,
+      {required bool isLast}) {
     final sec = tmpl.sections.firstWhere((s) => s.id == tab.sectionId);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Text(sec.title, style: Theme.of(context).textTheme.headlineMedium),
       const SizedBox(height: 64),
 
       if (tab.type == _TabType.fields)
-        SectionForm(section: sec, answers: _fieldAnswers[sec.id] ?? {},
-            errors: _errors, computedFields: _skipFieldsForSection(sec.id),
+        SectionForm(
+            section: sec,
+            answers: _fieldAnswers[sec.id] ?? {},
+            errors: _errors,
+            computedFields: _skipFieldsForSection(sec.id),
             onFieldChanged: (n, v) => _setFieldValue(sec.id, n, v)),
 
       if (tab.type == _TabType.table) ...[
         // ── Months-селектор над таблицей ──
         _buildMonthsAboveTable(tmpl, sec.id),
-        TableForm(section: sec, rows: _tableAnswers[sec.id] ?? [{}],
+        TableForm(
+            section: sec,
+            rows: _tableAnswers[sec.id] ?? [{}],
             columnDefaults: _tableColumnDefaults,
             onRowChanged: (i, r) => _setTableRow(sec.id, i, r),
             onAddRow: () => _addTableRow(sec.id),
@@ -467,31 +606,52 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
       if (!isLast) ...[
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           if (_tabController != null && _tabController!.index > 0)
-            Expanded(child: Padding(padding: const EdgeInsets.only(right: 8),
-              child: SizedBox(height: 48, child: ElevatedButton(
-                onPressed: () => _tabController!.animateTo(_tabController!.index - 1),
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceVariant,
-                    foregroundColor: AppColors.surface,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
-                child: const Text('Назад')))))
-          else const Spacer(),
-          Expanded(child: Padding(padding: const EdgeInsets.only(left: 8),
-            child: SizedBox(height: 48, child: ElevatedButton(
-              onPressed: () => _tabController?.animateTo(_tabController!.index + 1),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceVariant,
-                  foregroundColor: AppColors.surface,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
-              child: const Text('Далее'))))),
+            Expanded(
+                child: Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: SizedBox(
+                        height: 48,
+                        child: ElevatedButton(
+                            onPressed: () => _tabController!
+                                .animateTo(_tabController!.index - 1),
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.surfaceVariant,
+                                foregroundColor: AppColors.surface,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(4))),
+                            child: const Text('Назад')))))
+          else
+            const Spacer(),
+          Expanded(
+              child: Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton(
+                          onPressed: () => _tabController
+                              ?.animateTo(_tabController!.index + 1),
+                          style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.surfaceVariant,
+                              foregroundColor: AppColors.surface,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4))),
+                          child: const Text('Далее'))))),
         ]),
       ] else ...[
         if (_tabController != null && _tabController!.index > 0) ...[
           Row(children: [
-            Expanded(child: SizedBox(height: 48, child: ElevatedButton(
-              onPressed: () => _tabController!.animateTo(_tabController!.index - 1),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceVariant,
-                  foregroundColor: AppColors.surface,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
-              child: const Text('Назад')))),
+            Expanded(
+                child: SizedBox(
+                    height: 48,
+                    child: ElevatedButton(
+                        onPressed: () => _tabController!
+                            .animateTo(_tabController!.index - 1),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.surfaceVariant,
+                            foregroundColor: AppColors.surface,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(4))),
+                        child: const Text('Назад')))),
             const SizedBox(width: 12),
             Expanded(child: _buildGenerateButton()),
           ]),
@@ -502,15 +662,24 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
   }
 
   Widget _buildGenerateButton() {
-    return SizedBox(height: 48, child: ElevatedButton(
-      onPressed: _generating ? null : _generate,
-      style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceVariant,
-          foregroundColor: AppColors.surface, disabledBackgroundColor: AppColors.buttonDisabled,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4))),
-      child: _generating
-          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-          : const Text('Сформировать документ', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
-    ));
+    return SizedBox(
+        height: 48,
+        child: ElevatedButton(
+          onPressed: _generating ? null : _generate,
+          style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.surfaceVariant,
+              foregroundColor: AppColors.surface,
+              disabledBackgroundColor: AppColors.buttonDisabled,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4))),
+          child: _generating
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Сформировать документ',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+        ));
   }
 }
 
