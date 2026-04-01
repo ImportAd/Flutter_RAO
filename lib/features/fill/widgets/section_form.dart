@@ -56,7 +56,7 @@ class SectionForm extends StatelessWidget {
     }
     if (field.textHandler == 'org_form_full_and_abbr') {
       return _SingleDefaultField(field: field, value: currentValue, errorText: errorText,
-          onChanged: (v) => onFieldChanged(field.name, v), overrideDefault: 'ООО');
+          onChanged: (v) => onFieldChanged(field.name, v), overrideDefault: 'Общество с ограниченной ответственностью');
     }
     if (field.fieldDefaults.length == 1) {
       return _SingleDefaultField(field: field, value: currentValue, errorText: errorText,
