@@ -90,13 +90,13 @@ class _DocumentsPageState extends State<DocumentsPage> with SingleTickerProvider
           padding: EdgeInsets.only(top: 16),
           child: Text(
             'Вы уверены, что хотите удалить все документы?',
-            style: TextStyle(fontSize: 16),
+            style: TextStyle(fontSize: 16, color: Color(0xFF000000)),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+            style: TextButton.styleFrom(foregroundColor: const Color(0xFFE00F0F)),
             child: const Text('Да, удалить'),
           ),
           ElevatedButton(
@@ -137,10 +137,10 @@ class _DocumentsPageState extends State<DocumentsPage> with SingleTickerProvider
                     children: [
                       // Заголовок + Очистить
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text('Заполненные документы',
                               style: Theme.of(context).textTheme.headlineMedium),
-                          const SizedBox(width: 20),
                           HeaderNavLink(
                             label: 'Очистить',
                             onTap: _showClearDialog,
@@ -150,24 +150,20 @@ class _DocumentsPageState extends State<DocumentsPage> with SingleTickerProvider
                       ),
                       const SizedBox(height: 24),
 
-                      // Табы
-                      Container(
-                        decoration: const BoxDecoration(
-                          border: Border(bottom: BorderSide(color: AppColors.divider)),
-                        ),
-                        child: TabBar(
-                          controller: _tabController,
-                          isScrollable: true,
-                          labelColor: AppColors.primary,
-                          unselectedLabelColor: AppColors.textHint,
-                          indicatorColor: AppColors.primary,
-                          labelStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                          unselectedLabelStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
-                          tabs: const [
-                            Tab(text: 'Все'),
-                            Tab(text: 'Дополнительные соглашения'),
-                          ],
-                        ),
+                      // Табы (50/50 ширина)
+                      TabBar(
+                        controller: _tabController,
+                        isScrollable: false,
+                        labelColor: AppColors.primary,
+                        unselectedLabelColor: AppColors.textHint,
+                        indicatorColor: AppColors.primary,
+                        indicatorSize: TabBarIndicatorSize.tab,
+                        labelStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        unselectedLabelStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400),
+                        tabs: const [
+                          Tab(text: 'Все'),
+                          Tab(text: 'Дополнительные соглашения'),
+                        ],
                       ),
                       const SizedBox(height: 8),
 

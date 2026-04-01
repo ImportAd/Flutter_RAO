@@ -80,13 +80,9 @@ class SectionForm extends StatelessWidget {
   }
 
   String? _hintForField(FieldModel field) {
-    // Убрали ld_num и ooo_name — теперь они показывают label как hint
-    const emptyHintFields = {'add_num', 'dol'};
-    if (emptyHintFields.contains(field.name)) return '';
     if (field.type == 'date') return 'формат 01.01.2025';
     if (field.textHandler == 'fio_full_and_initials') return 'Полностью';
     if (field.textHandler == 'org_form_full_and_abbr') return '';
-    if (field.textHandler == 'position_nom_and_gen') return 'в именительном падеже';
     return null;
   }
 }
@@ -653,8 +649,6 @@ class _StampField extends StatelessWidget {
           const SizedBox(height: 8),
           AppChoiceChips(
               options: const ['М.П.', 'Б.П.'], selected: value, onSelected: onChanged),
-          const SizedBox(height: 4),
-          Text('Обычно М.П.', style: Theme.of(context).textTheme.bodySmall),
           if (errorText != null)
             Padding(
                 padding: const EdgeInsets.only(top: 4),

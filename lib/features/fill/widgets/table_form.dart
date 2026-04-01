@@ -114,6 +114,18 @@ class TableForm extends StatelessWidget {
       );
     }
 
+    // ── period_fee → маска денег 1 234 567,89 ──
+    if (col.name == 'period_fee') {
+      return _MoneyTableCell(
+        value: currentVal,
+        onChanged: (v) {
+          final newRow = Map<String, String>.from(row);
+          newRow[col.name] = v;
+          onRowChanged(rowIdx, newRow);
+        },
+      );
+    }
+
     // ── Dropdown с дефолтами (включая «Ввести вручную») ──
     if (defaults != null && defaults.isNotEmpty) {
       return _DropdownCell(
@@ -169,6 +181,166 @@ class TableForm extends StatelessWidget {
       case 'payment_terms': return 1.4;
       default: return 1.5;
     }
+  }
+}
+
+
+// ══════════════════════════════════════════
+//  Маска денег: 1 234 567,89
+// ══════════════════════════════════════════
+
+class _MoneyMaskFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    // Убираем всё кроме цифр и запятой/точки
+    var raw = newValue.text.replaceAll(RegExp(r'[^\d,.]'), '');
+
+    // Заменяем точку на запятую для единообразия
+    raw = raw.replaceAll('.', ',');
+
+    // Только одна запятая
+    final commaIdx = raw.indexOf(',');
+    if (commaIdx >= 0) {
+      final before = raw.substring(0, commaIdx).replaceAll(',', '');
+      var after = raw.substring(commaIdx + 1).replaceAll(',', '');
+      // Максимум 2 знака после запятой
+      if (after.length > 2) after = after.substring(0, 2);
+      raw = '$before,$after';
+    }
+
+    // Разделяем на целую и дробную части
+    String intPart;
+    String decPart;
+    if (raw.contains(',')) {
+      final parts = raw.split(',');
+      intPart = parts[0];
+      decPart = parts.length > 1 ? parts[1] : '';
+    } else {
+      intPart = raw;
+      decPart = '';
+    }
+
+    // Убираем ведущие нули (но оставляем один ноль если строка пустая)
+    if (intPart.length > 1) {
+      intPart = intPart.replaceFirst(RegExp(r'^0+'), '');
+      if (intPart.isEmpty) intPart = '0';
+    }
+    if (intPart.isEmpty && decPart.isEmpty && !raw.contains(',')) {
+      return const TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+      );
+    }
+    if (intPart.isEmpty) intPart = '0';
+
+    // Форматируем целую часть с пробелами
+    final formatted = StringBuffer();
+    for (int i = 0; i < intPart.length; i++) {
+      if (i > 0 && (intPart.length - i) % 3 == 0) {
+        formatted.write(' ');
+      }
+      formatted.write(intPart[i]);
+    }
+
+    String text = formatted.toString();
+    if (raw.contains(',')) {
+      text = '$text,$decPart';
+    }
+
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+}
+
+/// Преобразовать отформатированное значение обратно в число-строку для расчётов
+String _moneyToRaw(String formatted) {
+  return formatted.replaceAll(' ', '').replaceAll(',', '.');
+}
+
+/// Отформатировать «сырое» значение в маску
+String _moneyToDisplay(String raw) {
+  if (raw.isEmpty) return '';
+
+  // Нормализуем
+  var s = raw.replaceAll(' ', '').replaceAll('\u00A0', '').replaceAll(',', '.');
+
+  // Парсим
+  final val = double.tryParse(s);
+  if (val == null) return raw;
+
+  final rub = val.truncate();
+  final kop = ((val - rub) * 100).round();
+
+  // Форматируем целую часть с пробелами
+  final rubStr = rub.toString();
+  final buf = StringBuffer();
+  for (int i = 0; i < rubStr.length; i++) {
+    if (i > 0 && (rubStr.length - i) % 3 == 0) {
+      buf.write(' ');
+    }
+    buf.write(rubStr[i]);
+  }
+
+  if (kop > 0 || raw.contains('.') || raw.contains(',')) {
+    return '${buf.toString()},${kop.toString().padLeft(2, '0')}';
+  }
+  return buf.toString();
+}
+
+class _MoneyTableCell extends StatefulWidget {
+  final String value;
+  final ValueChanged<String> onChanged;
+  const _MoneyTableCell({required this.value, required this.onChanged});
+  @override
+  State<_MoneyTableCell> createState() => _MoneyTableCellState();
+}
+
+class _MoneyTableCellState extends State<_MoneyTableCell> {
+  late TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: _moneyToDisplay(widget.value));
+  }
+
+  @override
+  void didUpdateWidget(covariant _MoneyTableCell old) {
+    super.didUpdateWidget(old);
+    if (old.value != widget.value) {
+      final d = _moneyToDisplay(widget.value);
+      if (_ctrl.text != d) _ctrl.text = d;
+    }
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: TextFormField(
+        controller: _ctrl,
+        keyboardType: TextInputType.number,
+        inputFormatters: [_MoneyMaskFormatter()],
+        decoration: const InputDecoration(
+          isDense: true,
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+          hintText: '0',
+          hintStyle: TextStyle(fontSize: 15, color: AppColors.textHint),
+        ),
+        style: const TextStyle(fontSize: 15, letterSpacing: 0.5),
+        onChanged: (formatted) {
+          // Передаём «сырое» значение для расчётов
+          widget.onChanged(formatted);
+        },
+      ),
+    );
   }
 }
 

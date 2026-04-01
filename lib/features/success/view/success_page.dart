@@ -61,8 +61,12 @@ class SuccessPage extends StatelessWidget {
             child: const Icon(Icons.check, size: 36, color: AppColors.primary)),
           const SizedBox(height: 28),
 
-          // Заголовок
-          Text('Договор $templateTitle\nуспешно сформирован',
+          // Заголовок: строка 1 = название, строка 2 = «успешно сформирован»
+          Text(templateTitle,
+              style: Theme.of(context).textTheme.headlineLarge,
+              textAlign: TextAlign.center),
+          const SizedBox(height: 4),
+          Text('успешно сформирован',
               style: Theme.of(context).textTheme.headlineLarge,
               textAlign: TextAlign.center),
 
@@ -125,54 +129,8 @@ class SuccessPage extends StatelessWidget {
             ),
           ],
 
-          const SizedBox(height: 40),
-          // Разделитель «или»
-          Row(children: [
-            const Expanded(child: Divider()),
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text('или', style: Theme.of(context).textTheme.bodyMedium)),
-            const Expanded(child: Divider()),
-          ]),
-          const SizedBox(height: 32),
-
-          // Создать новый документ
-          Text('Создать новый документ', style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 28),
-
-          Text('Компания', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          _SegRow(options: const ['ФОРМАКС', 'РАО', 'ВОИС'], onTap: (_) => context.go('/')),
-          const SizedBox(height: 24),
-
-          Text('Форма собственности', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          _SegRow(options: const ['ООО', 'ИП до 2017', 'ИП с 2017'], onTap: (_) => context.go('/')),
         ]),
       )),
     ));
-  }
-}
-
-class _SegRow extends StatelessWidget {
-  final List<String> options;
-  final ValueChanged<String> onTap;
-  const _SegRow({required this.options, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(border: Border.all(color: AppColors.divider), borderRadius: BorderRadius.circular(4)),
-      child: IntrinsicHeight(child: Row(
-        children: options.map((o) => Expanded(child: InkWell(
-          onTap: () => onTap(o),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 14), alignment: Alignment.center,
-            decoration: BoxDecoration(
-              border: Border(left: o == options.first ? BorderSide.none : BorderSide(color: AppColors.divider))),
-            child: Text(o, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-          ),
-        ))).toList(),
-      )),
-    );
   }
 }
