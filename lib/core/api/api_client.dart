@@ -96,6 +96,12 @@ class ApiClient {
     return Map<String, dynamic>.from(resp.data);
   }
 
+  Future<Map<String, dynamic>> deleteAllDocuments() async {
+    _setAuth();
+    final resp = await _dio.delete('/api/v1/documents');
+    return Map<String, dynamic>.from(resp.data);
+  }
+
   // ──── Defaults ────
 
   Future<List<String>> getSystemDefaults(String key) async {

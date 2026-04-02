@@ -95,7 +95,27 @@ class _DocumentsPageState extends State<DocumentsPage> with SingleTickerProvider
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              try {
+                final api = context.read<ApiClient>();
+                await api.deleteAllDocuments();
+                setState(() {
+                  _docs = [];
+                });
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Документы удалены')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Ошибка удаления: $e')),
+                  );
+                }
+              }
+            },
             style: TextButton.styleFrom(foregroundColor: const Color(0xFFE00F0F)),
             child: const Text('Да, удалить'),
           ),
