@@ -144,7 +144,7 @@ class _DocumentsPageState extends State<DocumentsPage> with SingleTickerProvider
                           HeaderNavLink(
                             label: 'Очистить',
                             onTap: _showClearDialog,
-                            color: AppColors.primary,
+                            color: AppColors.error,
                           ),
                         ],
                       ),
