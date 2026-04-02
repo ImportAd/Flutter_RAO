@@ -169,7 +169,6 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
     const aliases = {
       'payment_order': ['payment_terms'],
       'punkt': ['category'],
-      'staf': ['tariff'],
     };
     final alts = aliases[colName] ?? [];
     return alts.map((a) => '$sectionId.$a').toList();
