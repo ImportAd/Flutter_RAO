@@ -11,12 +11,14 @@ import '../../../shared/widgets/header_nav_link.dart';
 
 class SuccessPage extends StatelessWidget {
   final String templateTitle, templateCode;
-  final String? filename, aktFilename;
+  final String? filename, aktFilename, edoFilename;
 
   const SuccessPage({super.key, required this.templateTitle, required this.templateCode,
-      this.filename, this.aktFilename});
+      this.filename, this.aktFilename, this.edoFilename});
 
   bool get _hasAkt => aktFilename != null && aktFilename!.isNotEmpty;
+  bool get _hasEdo => edoFilename != null && edoFilename!.isNotEmpty;
+  bool get _hasExtras => _hasAkt || _hasEdo;
 
   /// Скачивает ЛД и автоматически АКТ (если есть)
   Future<void> _downloadAll(BuildContext context) async {
@@ -31,6 +33,12 @@ class SuccessPage extends StatelessWidget {
         final aktBytes = await api.downloadFile(aktFilename!);
         await Future.delayed(const Duration(milliseconds: 500));
         _saveBlobToFile(aktBytes, aktFilename!);
+      }
+      // ЭДО — автоматически третьим файлом
+      if (edoFilename != null) {
+        final edoBytes = await api.downloadFile(edoFilename!);
+        await Future.delayed(const Duration(milliseconds: 500));
+        _saveBlobToFile(edoBytes, edoFilename!);
       }
     } catch (e) {
       if (context.mounted) {
@@ -71,7 +79,7 @@ class SuccessPage extends StatelessWidget {
               textAlign: TextAlign.center),
 
           // Информация об АКТе (если есть)
-          if (_hasAkt) ...[
+          if (_hasExtras) ...[
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -105,12 +113,12 @@ class SuccessPage extends StatelessWidget {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                   ),
                   child: Text(
-                    _hasAkt ? 'Скачать файлы' : 'Скачать файл',
+                    _hasExtras ? 'Скачать файлы' : 'Скачать файл',
                     style: const TextStyle(fontSize: 15),
                   ),
                 ),
               ),
-              if (_hasAkt) ...[
+              if (_hasExtras) ...[
                 const SizedBox(width: 20),
                 HeaderNavLink(
                   label: 'На главную',
@@ -121,7 +129,7 @@ class SuccessPage extends StatelessWidget {
           ),
 
           // Если нет АКТа — простая ссылка на главную
-          if (!_hasAkt) ...[
+          if (!_hasExtras) ...[
             const SizedBox(height: 12),
             HeaderNavLink(
               label: 'На главную',

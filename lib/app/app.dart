@@ -40,6 +40,7 @@ GoRouter _createRouter(ApiClient api) {
             templateCode: extra['code'] as String? ?? '',
             filename: extra['filename'] as String?,
             aktFilename: extra['akt_filename'] as String?,
+            edoFilename: extra['edo_filename'] as String?,
           );
         },
       ),

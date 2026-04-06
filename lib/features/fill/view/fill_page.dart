@@ -339,6 +339,7 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
           'code': _template!.code,
           'filename': result['filename'],
           'akt_filename': result['akt_filename'],
+          'edo_filename': result['edo_filename'],
         });
       }
     } catch (e) {
