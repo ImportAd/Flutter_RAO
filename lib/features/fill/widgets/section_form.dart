@@ -432,33 +432,50 @@ class MonthsSelector extends StatelessWidget {
       children: [
         Text(field.label, style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
-        Table(
-          border: TableBorder.all(color: AppColors.divider, width: 0.5),
-          children: List.generate(
-              4,
-              (row) => TableRow(
-                  children: List.generate(3, (col) {
-                    final m = months[row * 3 + col];
-                    final isSel = sel.contains(m.toLowerCase());
-                    return GestureDetector(
-                      onTap: () => _toggle(m),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                        color: isSel ? AppColors.primary.withOpacity(0.15) : Colors.transparent,
-                        child: Text(m,
-                            style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: isSel ? FontWeight.w600 : FontWeight.w400,
-                                color: isSel ? AppColors.primary : AppColors.textPrimary)),
+        // 4 ряда × 3 колонки, без Table — чипы как в AppChoiceChips._buildHorizontal
+        for (int row = 0; row < 4; row++) ...[
+          if (row > 0) const SizedBox(height: 4),
+          Row(
+            children: List.generate(5, (index) {
+              if (index.isOdd) return const SizedBox(width: 4);
+              final m = months[row * 3 + index ~/ 2];
+              final isSelected = sel.contains(m.toLowerCase());
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => _toggle(m),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? const Color(0xFF01909B)
+                          : const Color(0xFFD3D3D3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      m,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: isSelected
+                            ? const Color(0xFFFFFFFF)
+                            : const Color(0xFF000000),
+                        fontWeight:
+                            isSelected ? FontWeight.w600 : FontWeight.w400,
+                        fontSize: 14,
                       ),
-                    );
-                  }))),
-        ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ],
         if (errorText != null)
           Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(errorText!,
-                  style: TextStyle(color: AppColors.error, fontSize: 12))),
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(errorText!,
+                style: TextStyle(color: AppColors.error, fontSize: 12)),
+          ),
       ],
     );
   }
