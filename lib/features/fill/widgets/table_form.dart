@@ -124,7 +124,7 @@ class TableForm extends StatelessWidget {
     }
 
     // ── period_fee → маска денег 1 234 567,89 ──
-    if (col.name == 'period_fee') {
+    if (col.name == 'period_fee' || col.name == 'sum') {
       return _MoneyTableCell(
         value: currentVal,
         onChanged: (v) {

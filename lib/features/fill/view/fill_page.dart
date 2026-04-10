@@ -30,6 +30,7 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
   bool _loading = true;
   String? _error;
   bool _generating = false;
+  String? _customFileName;
 
   final Map<String, Map<String, String>> _fieldAnswers = {};
   final Map<String, List<Map<String, String>>> _tableAnswers = {};
@@ -319,6 +320,8 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
       final answers = <String, dynamic>{
         'fields': Map<String, dynamic>.from(_fieldAnswers),
         'tables': _buildRequestTables(),
+        if (_customFileName != null)
+    '_meta': {'custom_filename': _customFileName},
       };
       if (_totalSumNum.isNotEmpty) {
         (answers['fields'] as Map)
@@ -356,30 +359,33 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
 
   Map<String, String> _normalizeTableRow(Map<String, String> row) {
     final normalized = Map<String, String>.from(row);
-    final rawPeriodFee = moneyToRaw(normalized['period_fee'] ?? '');
-
-    if (rawPeriodFee.isEmpty) {
-      normalized.remove('period_fee');
-    } else {
-      normalized['period_fee'] = rawPeriodFee;
+    for (final key in const ['period_fee', 'sum']) {
+      final raw = moneyToRaw(normalized[key] ?? '');
+      if (raw.isEmpty) {
+        normalized.remove(key);
+      } else {
+        normalized[key] = raw;
+      }
     }
-
     return normalized;
   }
 
   Map<String, List<Map<String, String>>> _buildRequestTables() {
-    return {
-      for (final entry in _tableAnswers.entries)
-        entry.key: entry.value.map((row) {
-          final serialized = Map<String, String>.from(row);
-          final rawPeriodFee = serialized['period_fee'] ?? '';
-          if (rawPeriodFee.isNotEmpty) {
-            serialized['period_fee'] = moneyToDisplay(rawPeriodFee);
+  return {
+    for (final entry in _tableAnswers.entries)
+      entry.key: entry.value.map((row) {
+        final serialized = Map<String, String>.from(row);
+        for (final key in const ['period_fee', 'sum']) {
+          final raw = serialized[key] ?? '';
+          if (raw.isNotEmpty) {
+            serialized[key] = moneyToDisplay(raw);
           }
-          return serialized;
-        }).toList(),
-    };
-  }
+        }
+        return serialized;
+      }).toList(),
+  };
+}
+
 
   void _showValidationErrors(List<String> fields) {
     showDialog(
@@ -452,9 +458,15 @@ class _FillPageState extends State<FillPage> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final tmpl = _template;
     return AppShell(
-      title: tmpl?.menuTitle ?? 'Загрузка...',
+      title: _customFileName ?? tmpl?.menuTitle ?? 'Загрузка...',
       showBack: true,
       onBack: () => context.go('/'),
+      onTitleChanged: tmpl == null
+      ? null
+      : (v) => setState(() {
+            final trimmed = v.trim();
+            _customFileName = trimmed.isEmpty ? null : trimmed;
+          }),
       child: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null

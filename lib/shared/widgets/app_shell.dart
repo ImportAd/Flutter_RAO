@@ -12,6 +12,7 @@ class AppShell extends StatelessWidget {
   final List<Widget>? actions;
   final bool showBack;
   final VoidCallback? onBack;
+  final ValueChanged<String>? onTitleChanged;
 
   const AppShell({
     super.key,
@@ -20,6 +21,7 @@ class AppShell extends StatelessWidget {
     this.actions,
     this.showBack = false,
     this.onBack,
+     this.onTitleChanged,
   });
 
   @override
@@ -34,6 +36,7 @@ class AppShell extends StatelessWidget {
             showBack: showBack,
             onBack: onBack,
             actions: actions,
+            onTitleChanged: onTitleChanged,
           ),
 
           // Контент
@@ -44,76 +47,157 @@ class AppShell extends StatelessWidget {
   }
 }
 
-class _Header extends StatelessWidget {
+class _Header extends StatefulWidget {
   final String title;
   final bool showBack;
   final VoidCallback? onBack;
   final List<Widget>? actions;
+  final ValueChanged<String>? onTitleChanged;
 
   const _Header({
     required this.title,
     required this.showBack,
     this.onBack,
     this.actions,
+    this.onTitleChanged,
   });
 
   @override
+  State<_Header> createState() => _HeaderState();
+}
+
+class _HeaderState extends State<_Header> {
+  bool _editing = false;
+  bool _iconHovered = false;
+  late TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.title);
+  }
+
+  @override
+  void didUpdateWidget(covariant _Header old) {
+    super.didUpdateWidget(old);
+    if (!_editing && old.title != widget.title) {
+      _ctrl.text = widget.title;
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _commit() {
+    widget.onTitleChanged?.call(_ctrl.text);
+    setState(() => _editing = false);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final editable = widget.onTitleChanged != null;
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
         color: AppColors.surface,
-        border: Border(
-          bottom: BorderSide(color: AppColors.divider),
-        ),
+        border: Border(bottom: BorderSide(color: AppColors.divider)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 1200),
         child: Row(
           children: [
-            // Навигация «Главная»
             HeaderNavLink(
               label: 'Главная',
               onTap: () => GoRouter.of(context).go('/'),
             ),
-
             const SizedBox(width: 20),
-
-            // «Личный кабинет»
             HeaderNavLink(
               label: 'Личный кабинет',
               onTap: () => GoRouter.of(context).go('/documents'),
             ),
-
-            // «Назад» — текстовая ссылка
-            if (showBack) ...[
+            if (widget.showBack) ...[
               const SizedBox(width: 20),
               HeaderNavLink(
                 label: 'Назад',
-                onTap: onBack ?? () => Navigator.of(context).maybePop(),
+                onTap: widget.onBack ?? () => Navigator.of(context).maybePop(),
               ),
             ],
-
             const Spacer(),
-            if (title.isNotEmpty) ...[
-              Center(
-                child: Text(
-                  title,
+
+            // ── Центр: title + иконка Edit ──
+            if (widget.title.isNotEmpty) ...[
+              if (_editing)
+                SizedBox(
+                  width: 360,
+                  child: TextField(
+                    controller: _ctrl,
+                    autofocus: true,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleMedium,
+                    decoration: InputDecoration(
+                      isDense: true,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                      hintText: widget.title,
+                      hintStyle: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(color: AppColors.textPrimary.withOpacity(0.4)),
+                    ),
+                    onSubmitted: (_) => _commit(),
+                    onEditingComplete: _commit,
+                  ),
+                )
+              else
+                Text(
+                  widget.title,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
-              ),
+              if (editable) ...[
+                const SizedBox(width: 8),
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  onEnter: (_) => setState(() => _iconHovered = true),
+                  onExit: (_) => setState(() => _iconHovered = false),
+                  child: GestureDetector(
+                    onTap: () {
+                      if (_editing) {
+                        _commit();
+                      } else {
+                        setState(() {
+                          _ctrl.text = widget.title;
+                          _ctrl.selection = TextSelection(
+                              baseOffset: 0, extentOffset: _ctrl.text.length);
+                          _editing = true;
+                        });
+                      }
+                    },
+                    child: Icon(
+                      Icons.edit,
+                      size: 18,
+                      color: _iconHovered
+                          ? AppColors.primaryDark
+                          : AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
             ],
 
             const Spacer(),
 
-            // Кнопка «Сообщить о проблеме»
-             HeaderNavLink(
+            HeaderNavLink(
               label: 'Сообщить о проблеме',
               onTap: () => _showReportDialog(context),
             ),
-
-            if (actions != null) ...actions!,
+            if (widget.actions != null) ...widget.actions!,
           ],
         ),
       ),
@@ -121,6 +205,7 @@ class _Header extends StatelessWidget {
   }
 
   void _showReportDialog(BuildContext context) {
+    // ← оставь прежнюю реализацию без изменений
     final controller = TextEditingController();
     showDialog(
       context: context,
@@ -129,9 +214,7 @@ class _Header extends StatelessWidget {
         content: TextField(
           controller: controller,
           maxLines: 4,
-          decoration: const InputDecoration(
-            hintText: 'Опишите проблему...',
-          ),
+          decoration: const InputDecoration(hintText: 'Опишите проблему...'),
         ),
         actions: [
           TextButton(
