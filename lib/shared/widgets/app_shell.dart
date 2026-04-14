@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme.dart';
 import '../../core/api/api_client.dart';
 
+import 'package:flutter_svg/flutter_svg.dart';
+
 /// Общий каркас страницы: шапка + контент + «Сообщить о проблеме»
 class AppShell extends StatelessWidget {
   final String title;
@@ -70,6 +72,7 @@ class _HeaderState extends State<_Header> {
   bool _editing = false;
   bool _iconHovered = false;
   late TextEditingController _ctrl;
+  double? _titleTextWidth;
 
   @override
   void initState() {
@@ -93,7 +96,20 @@ class _HeaderState extends State<_Header> {
 
   void _commit() {
     widget.onTitleChanged?.call(_ctrl.text);
-    setState(() => _editing = false);
+    setState(() {
+      _editing = false;
+      _titleTextWidth = null;
+    });
+  }
+
+  double _measureTextWidth(String text, TextStyle? style) {
+    final tp = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+      textScaleFactor: MediaQuery.of(context).textScaleFactor,
+      maxLines: 1,
+    )..layout(minWidth: 0, maxWidth: double.infinity);
+    return tp.width;
   }
 
   @override
@@ -133,7 +149,7 @@ class _HeaderState extends State<_Header> {
             if (widget.title.isNotEmpty) ...[
               if (_editing)
                 SizedBox(
-                  width: 360,
+                  width: _titleTextWidth ?? 360,
                   child: TextField(
                     controller: _ctrl,
                     autofocus: true,
@@ -176,15 +192,25 @@ class _HeaderState extends State<_Header> {
                           _ctrl.selection = TextSelection(
                               baseOffset: 0, extentOffset: _ctrl.text.length);
                           _editing = true;
+                          _titleTextWidth = _measureTextWidth(
+                            widget.title,
+                            Theme.of(context).textTheme.titleMedium,
+                          );
+                          _titleTextWidth = _titleTextWidth! + 12;
                         });
                       }
                     },
-                    child: Icon(
-                      Icons.edit,
-                      size: 18,
-                      color: _iconHovered
-                          ? AppColors.primaryDark
-                          : AppColors.primary,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: SvgPicture.asset(
+                        _editing ? 'assets/icons/chek.svg' : 'assets/icons/edit.svg',
+                        width: 18,
+                        height: 18,
+                        colorFilter: ColorFilter.mode(
+                          _iconHovered ? AppColors.primaryDark : AppColors.primary,
+                          BlendMode.srcIn,
+                        ),
+                      ),
                     ),
                   ),
                 ),
